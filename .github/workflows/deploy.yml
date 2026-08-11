@@ -1,10 +1,8 @@
 name: Deploy JaraSend Admin Dashboard
-
 on:
   push:
     branches: [main, master]
   workflow_dispatch:
-
 jobs:
   deploy:
     name: Build and deploy to Firebase Hosting
@@ -12,25 +10,21 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-
       - name: Install dependencies
         run: npm ci
-
       - name: Build
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
-
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JARASEND_1D32A }}'
           projectId: jarasend-1d32a
           channelId: live
