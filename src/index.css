@@ -1,0 +1,41 @@
+:root {
+  --green: #0F9D58;
+  --green-dark: #0B6E4F;
+  --green-tint: #EAF3DE;
+  --navy: #0B1F3A;
+  --gold: #F2B705;
+  --gold-tint: #FDF3D6;
+  --bg: #F5F7FA;
+  --text: #1F2937;
+  --slate: #6B7280;
+  --divider: #E5E7EB;
+  --error: #DC2626;
+  --error-tint: #FDE8E8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+h1, h2, h3, .num {
+  font-family: 'Poppins', sans-serif;
+  color: var(--navy);
+  margin: 0;
+}
+
+.mono {
+  font-family: 'Roboto Mono', monospace;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+a { text-decoration: none; color: inherit; }
