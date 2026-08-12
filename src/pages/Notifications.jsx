@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import TableToolbar from '../components/TableToolbar'
+import PeriodDropdown, { filterByPeriod } from '../components/PeriodDropdown'
 
 const TYPE_LABELS = {
   moneySent: 'Money sent', moneyReceived: 'Money received', pickupCompleted: 'Pickup completed',
@@ -12,6 +14,7 @@ export default function Notifications() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('All')
+  const [period, setPeriod] = useState('All time')
 
   useEffect(() => {
     let cancelled = false
@@ -50,7 +53,7 @@ export default function Notifications() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
+    const base = rows.filter((r) => {
       const matchesType = typeFilter === 'All' || r.type === typeFilter
       const matchesSearch = !q ||
         r.profile?.full_name?.toLowerCase().includes(q) ||
@@ -58,7 +61,8 @@ export default function Notifications() {
         r.title?.toLowerCase().includes(q)
       return matchesType && matchesSearch
     })
-  }, [rows, search, typeFilter])
+    return filterByPeriod(base, period, (r) => new Date(r.created_at))
+  }, [rows, search, typeFilter, period])
 
   return (
     <div style={{ padding: 28 }}>
@@ -81,7 +85,7 @@ export default function Notifications() {
         />
       </div>
 
-      <div style={{ margin: '16px 0' }}>
+      <div className="no-print" style={{ margin: '16px 0', display: 'flex', gap: 8, alignItems: 'center' }}>
         <select
           value={typeFilter}
           onChange={(e) => setTypeFilter(e.target.value)}
@@ -92,6 +96,20 @@ export default function Notifications() {
             <option key={key} value={key}>{label}</option>
           ))}
         </select>
+        <PeriodDropdown value={period} onChange={setPeriod} />
+        <TableToolbar
+          filename="notifications"
+          rows={filtered}
+          columns={[
+            { label: 'User', value: (r) => r.profile ? `${r.profile.full_name} ${r.profile.surname}` : '' },
+            { label: 'Phone', value: (r) => r.profile?.phone || '' },
+            { label: 'Type', value: (r) => TYPE_LABELS[r.type] ?? r.type },
+            { label: 'Title', value: (r) => r.title },
+            { label: 'Body', value: (r) => r.body },
+            { label: 'Read', value: (r) => r.read ? 'Read' : 'Unread' },
+            { label: 'Sent', value: (r) => new Date(r.created_at).toLocaleString() },
+          ]}
+        />
       </div>
 
       {error && (

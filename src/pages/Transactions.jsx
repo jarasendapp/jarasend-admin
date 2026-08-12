@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react'
 import StatusBadge from '../components/StatusBadge'
+import TableToolbar from '../components/TableToolbar'
+import PeriodDropdown, { filterByPeriod } from '../components/PeriodDropdown'
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
@@ -29,15 +31,19 @@ const SAMPLE_TX = [
 export default function Transactions() {
   const [typeFilter, setTypeFilter] = useState('All')
   const [search, setSearch] = useState('')
+  const [period, setPeriod] = useState('All time')
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return SAMPLE_TX.filter((t) => {
+    const base = SAMPLE_TX.filter((t) => {
       const matchesType = typeFilter === 'All' || t.type === typeFilter
       const matchesSearch = !q || t.name.toLowerCase().includes(q) || t.ref.toLowerCase().includes(q)
       return matchesType && matchesSearch
     })
-  }, [typeFilter, search])
+    // Sample dates are 'YYYY-MM-DD HH:MM' strings - normalize to ISO
+    // (replace the space with 'T') for reliable cross-browser parsing.
+    return filterByPeriod(base, period, (t) => new Date(t.date.replace(' ', 'T')))
+  }, [typeFilter, search, period])
 
   return (
     <div style={{ padding: 28 }}>
@@ -46,9 +52,24 @@ export default function Transactions() {
           <h1 style={{ fontSize: 22, marginBottom: 4 }}>Transactions</h1>
           <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0 }}>Every send, receive, pickup, and withdrawal.</p>
         </div>
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20, marginTop: 4 }}>
-          SAMPLE DATA
-        </span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className="no-print" style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20 }}>
+            SAMPLE DATA
+          </span>
+          <TableToolbar
+            filename="transactions"
+            rows={filtered}
+            columns={[
+              { label: 'Reference', value: (t) => t.ref },
+              { label: 'Account', value: (t) => t.name },
+              { label: 'Type', value: (t) => TYPE_LABELS[t.type] },
+              { label: 'Amount', value: (t) => t.amount },
+              { label: 'Fee', value: (t) => t.fee },
+              { label: 'Status', value: (t) => STATUS_MAP[t.status] },
+              { label: 'Date', value: (t) => t.date },
+            ]}
+          />
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, margin: '20px 0 18px', flexWrap: 'wrap' }}>
@@ -66,6 +87,7 @@ export default function Transactions() {
             {t === 'All' ? 'All' : TYPE_LABELS[t]}
           </button>
         ))}
+        <PeriodDropdown value={period} onChange={setPeriod} />
         <input
           type="text"
           placeholder="Search name or reference…"

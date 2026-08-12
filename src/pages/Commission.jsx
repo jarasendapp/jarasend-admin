@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import TableToolbar from '../components/TableToolbar'
 
 // This is the ACTUAL formula from the mobile app's transaction repository
 // (calculateAgentCommission) — not an approximation. Below ₦5,000 sent,
@@ -95,9 +96,20 @@ export default function Commission() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '28px 0 14px' }}>
         <h3 style={{ fontSize: 14 }}>Top earning agents this month</h3>
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '2px 7px', borderRadius: 20 }}>
+        <span className="no-print" style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '2px 7px', borderRadius: 20 }}>
           SAMPLE DATA
         </span>
+        <div style={{ marginLeft: 'auto' }}>
+          <TableToolbar
+            filename="top-earning-agents"
+            rows={SAMPLE_TOP_EARNERS}
+            columns={[
+              { label: 'Agent', value: (a) => a.name },
+              { label: 'Location', value: (a) => a.location },
+              { label: 'Commission paid', value: (a) => a.paid },
+            ]}
+          />
+        </div>
       </div>
       <div style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>

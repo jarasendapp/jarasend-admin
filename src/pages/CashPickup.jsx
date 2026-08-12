@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import StatusBadge from '../components/StatusBadge'
+import TableToolbar from '../components/TableToolbar'
 
 // Sample data — cash pickup/transaction records are not yet centralized
 // in Supabase (they live on individual devices), so this page can't pull
@@ -57,9 +58,24 @@ export default function CashPickup() {
             Every receiver, redemption code, assigned agent, and pickup status.
           </p>
         </div>
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20, marginTop: 4 }}>
-          SAMPLE DATA
-        </span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className="no-print" style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20 }}>
+            SAMPLE DATA
+          </span>
+          <TableToolbar
+            filename="cash-pickup"
+            rows={filtered}
+            columns={[
+              { label: 'Receiver mobile', value: (p) => p.receiverMobile },
+              { label: 'Amount sent', value: (p) => p.amount },
+              { label: 'Sent (date & time)', value: (p) => p.sentAt },
+              { label: 'Redemption code', value: (p) => p.code },
+              { label: 'Assigned agent', value: (p) => p.agent },
+              { label: 'Status', value: (p) => p.status },
+              { label: 'Status timestamp', value: (p) => p.statusAt },
+            ]}
+          />
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, margin: '20px 0 18px', flexWrap: 'wrap' }}>

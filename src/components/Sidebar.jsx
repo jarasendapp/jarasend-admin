@@ -58,7 +58,7 @@ export default function Sidebar() {
   const { adminProfile, logout } = useAdminAuth()
 
   return (
-    <div style={{
+    <div className="no-print" style={{
       width: 250, background: 'var(--navy)', flexShrink: 0, padding: '20px 14px',
       display: 'flex', flexDirection: 'column', position: 'sticky', top: 0,
       height: '100vh', overflowY: 'auto',

@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import TableToolbar from '../components/TableToolbar'
+import PeriodDropdown, { filterByPeriod } from '../components/PeriodDropdown'
 
 export default function FraudMonitoring() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [period, setPeriod] = useState('All time')
 
   useEffect(() => {
     let cancelled = false
@@ -42,14 +45,31 @@ export default function FraudMonitoring() {
     return () => { cancelled = true }
   }, [])
 
+  const filtered = useMemo(() => filterByPeriod(rows, period, (r) => new Date(r.date_time)), [rows, period])
+
   return (
     <div style={{ padding: 28 }}>
       <h1 style={{ fontSize: 22, marginBottom: 4 }}>Fraud monitoring</h1>
-      <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0, marginBottom: 4 }}>
-        {loading ? 'Loading…' : `${rows.length} flagged event${rows.length === 1 ? '' : 's'}`} — every alert the
+      <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0, marginBottom: 16 }}>
+        {loading ? 'Loading…' : `${filtered.length} flagged event${filtered.length === 1 ? '' : 's'}`} — every alert the
         app's own pattern checks have raised (rapid repeat transfers, amounts near daily limits, invalid claim
         code attempts, and similar). These are real, not sample data.
       </p>
+
+      <div className="no-print" style={{ display: 'flex', gap: 8, marginBottom: 4 }}>
+        <PeriodDropdown value={period} onChange={setPeriod} />
+        <TableToolbar
+          filename="fraud-alerts"
+          rows={filtered}
+          columns={[
+            { label: 'Account', value: (r) => r.profile ? `${r.profile.full_name} ${r.profile.surname}` : '' },
+            { label: 'Phone', value: (r) => r.profile?.phone || '' },
+            { label: 'Reason flagged', value: (r) => r.detail },
+            { label: 'Device', value: (r) => r.device_id || '' },
+            { label: 'When', value: (r) => new Date(r.date_time).toLocaleString() },
+          ]}
+        />
+      </div>
 
       {error && (
         <div style={{ background: 'var(--error-tint)', color: 'var(--error)', borderRadius: 10, padding: '12px 14px', fontSize: 13, margin: '16px 0' }}>
@@ -69,7 +89,7 @@ export default function FraudMonitoring() {
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => (
+            {filtered.map((r) => (
               <tr key={r.id} style={{ borderBottom: '1px solid var(--divider)' }}>
                 <td style={{ padding: '12px 16px', fontWeight: 600 }}>{r.profile ? `${r.profile.full_name} ${r.profile.surname}` : '—'}</td>
                 <td style={{ padding: '12px 16px' }} className="mono">{r.profile?.phone || '—'}</td>
@@ -82,7 +102,7 @@ export default function FraudMonitoring() {
                 <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{new Date(r.date_time).toLocaleString()}</td>
               </tr>
             ))}
-            {!loading && rows.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <tr>
                 <td colSpan={5} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>
                   No fraud alerts have been raised.

@@ -39,3 +39,28 @@ button {
 }
 
 a { text-decoration: none; color: inherit; }
+
+/* Print support — used by every page's "Print" button. The sidebar is
+   marked .no-print in Sidebar.jsx; any per-page controls that shouldn't
+   appear on paper (search boxes, filter chips, action buttons) get the
+   same class. Content marked .print-only is hidden on screen and only
+   appears in the printed output. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  table {
+    font-size: 11px !important;
+  }
+}
+.print-only {
+  display: none;
+}
+@media print {
+  .print-only {
+    display: block;
+  }
+}

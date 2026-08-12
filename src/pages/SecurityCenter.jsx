@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import TableToolbar from '../components/TableToolbar'
+import PeriodDropdown, { filterByPeriod } from '../components/PeriodDropdown'
 
 const SECURITY_ACTIONS = ['login', 'logout', 'passwordChanged', 'pinChanged', 'biometricEnabled', 'biometricLogin', 'sessionLocked']
 const ACTION_LABELS = {
@@ -13,6 +15,7 @@ export default function SecurityCenter() {
   const [error, setError] = useState(null)
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('All')
+  const [period, setPeriod] = useState('All time')
 
   useEffect(() => {
     let cancelled = false
@@ -52,12 +55,13 @@ export default function SecurityCenter() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return rows.filter((r) => {
+    const base = rows.filter((r) => {
       const matchesAction = actionFilter === 'All' || r.action === actionFilter
       const matchesSearch = !q || r.profile?.full_name?.toLowerCase().includes(q) || r.profile?.phone?.toLowerCase().includes(q)
       return matchesAction && matchesSearch
     })
-  }, [rows, search, actionFilter])
+    return filterByPeriod(base, period, (r) => new Date(r.date_time))
+  }, [rows, search, actionFilter, period])
 
   return (
     <div style={{ padding: 28 }}>
@@ -77,7 +81,7 @@ export default function SecurityCenter() {
         />
       </div>
 
-      <div style={{ margin: '16px 0' }}>
+      <div className="no-print" style={{ margin: '16px 0', display: 'flex', gap: 8, alignItems: 'center' }}>
         <select
           value={actionFilter}
           onChange={(e) => setActionFilter(e.target.value)}
@@ -88,6 +92,19 @@ export default function SecurityCenter() {
             <option key={a} value={a}>{ACTION_LABELS[a]}</option>
           ))}
         </select>
+        <PeriodDropdown value={period} onChange={setPeriod} />
+        <TableToolbar
+          filename="security-events"
+          rows={filtered}
+          columns={[
+            { label: 'Account', value: (r) => r.profile ? `${r.profile.full_name} ${r.profile.surname}` : '' },
+            { label: 'Phone', value: (r) => r.profile?.phone || '' },
+            { label: 'Event', value: (r) => ACTION_LABELS[r.action] ?? r.action },
+            { label: 'Detail', value: (r) => r.detail },
+            { label: 'Device', value: (r) => r.device_id || '' },
+            { label: 'When', value: (r) => new Date(r.date_time).toLocaleString() },
+          ]}
+        />
       </div>
 
       {error && (

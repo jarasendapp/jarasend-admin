@@ -17,6 +17,7 @@ export default function KycManagement() {
   const [actioning, setActioning] = useState(false)
   // The action awaiting confirmation - null when no dialog is open.
   const [pendingAction, setPendingAction] = useState(null)
+  const [viewingDoc, setViewingDoc] = useState(null) // { label, base64 } | null
 
   async function load() {
     setLoading(true)
@@ -78,7 +79,7 @@ export default function KycManagement() {
 
   return (
     <div style={{ padding: 28, display: 'flex', gap: 20, height: 'calc(100vh - 56px)' }}>
-      <div style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
+      <div className="no-print" style={{ width: 380, flexShrink: 0, display: 'flex', flexDirection: 'column' }}>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>KYC management</h1>
         <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0, marginBottom: 16 }}>
           {loading ? 'Loading…' : `${filtered.length} ${filter.toLowerCase()} submission${filtered.length === 1 ? '' : 's'}`}
@@ -143,7 +144,12 @@ export default function KycManagement() {
             Select a submission to review it.
           </div>
         ) : (
-          <KycDetail record={selected} onRequestDecision={(newStatus) => setPendingAction({ record: selected, newStatus })} actionError={actionError} />
+          <KycDetail
+            record={selected}
+            onRequestDecision={(newStatus) => setPendingAction({ record: selected, newStatus })}
+            actionError={actionError}
+            onViewDocument={(label, base64) => setViewingDoc({ label, base64 })}
+          />
         )}
       </div>
 
@@ -155,11 +161,14 @@ export default function KycManagement() {
           onConfirm={confirmDecision}
         />
       )}
+      {viewingDoc && (
+        <DocumentLightbox doc={viewingDoc} onClose={() => setViewingDoc(null)} />
+      )}
     </div>
   )
 }
 
-function KycDetail({ record, onRequestDecision, actionError }) {
+function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
   const isAgent = record.role === 'agent'
   return (
     <div>
@@ -170,7 +179,20 @@ function KycDetail({ record, onRequestDecision, actionError }) {
             {record.profile?.phone} · {record.profile?.email || 'no email'}
           </p>
         </div>
-        <StatusBadge status={STATUS_LABELS[record.status] ?? 'Pending'} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <StatusBadge status={STATUS_LABELS[record.status] ?? 'Pending'} />
+          <button
+            className="no-print"
+            onClick={() => window.print()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px',
+              borderRadius: 10, border: '1px solid var(--divider)', background: '#fff',
+              fontSize: 12.5, fontWeight: 600, color: 'var(--navy)',
+            }}
+          >
+            🖨 Print
+          </button>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
@@ -205,10 +227,10 @@ function KycDetail({ record, onRequestDecision, actionError }) {
         Uploaded documents
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <DocImage label="Government ID" base64={record.id_image_base64} />
-        <DocImage label="Selfie" base64={record.selfie_image_base64} />
-        {isAgent && <DocImage label="Business photo" base64={record.business_photo_base64} />}
-        {isAgent && <DocImage label="Company registration certificate" base64={record.company_reg_cert_base64} />}
+        <DocImage label="Government ID" base64={record.id_image_base64} onClick={() => onViewDocument('Government ID', record.id_image_base64)} />
+        <DocImage label="Selfie" base64={record.selfie_image_base64} onClick={() => onViewDocument('Selfie', record.selfie_image_base64)} />
+        {isAgent && <DocImage label="Business photo" base64={record.business_photo_base64} onClick={() => onViewDocument('Business photo', record.business_photo_base64)} />}
+        {isAgent && <DocImage label="Company registration certificate" base64={record.company_reg_cert_base64} onClick={() => onViewDocument('Company registration certificate', record.company_reg_cert_base64)} />}
       </div>
 
       {record.status === 'pending' && (
@@ -307,17 +329,50 @@ function Field({ label, value, mono, capitalize }) {
   )
 }
 
-function DocImage({ label, base64 }) {
+function DocumentLightbox({ doc, onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(11,31,58,0.85)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 24,
+      }}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, width: '100%' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <span style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{doc.label}</span>
+          <button
+            onClick={onClose}
+            style={{ background: 'rgba(255,255,255,0.15)', border: 'none', color: '#fff', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 600 }}
+          >
+            Close
+          </button>
+        </div>
+        <img
+          src={`data:image/jpeg;base64,${doc.base64}`}
+          alt={doc.label}
+          style={{ width: '100%', borderRadius: 12, display: 'block' }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function DocImage({ label, base64, onClick }) {
   return (
     <div>
-      <div style={{
-        width: '100%', aspectRatio: '1', borderRadius: 10, border: '1px solid var(--divider)',
-        background: base64 ? `url(data:image/jpeg;base64,${base64}) center/cover` : '#F5F5F5',
-        display: base64 ? 'block' : 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>
+      <div
+        onClick={base64 ? onClick : undefined}
+        style={{
+          width: '100%', aspectRatio: '1', borderRadius: 10, border: '1px solid var(--divider)',
+          background: base64 ? `url(data:image/jpeg;base64,${base64}) center/cover` : '#F5F5F5',
+          display: base64 ? 'block' : 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: base64 ? 'pointer' : 'default',
+        }}
+      >
         {!base64 && <span style={{ fontSize: 11, color: 'var(--slate)' }}>Not uploaded</span>}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 5 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 5 }}>{label}{base64 ? ' — click to view' : ''}</div>
     </div>
   )
 }

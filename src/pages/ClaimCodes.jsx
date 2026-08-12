@@ -75,6 +75,16 @@ export default function ClaimCodes() {
           <Row label="Amount" value={formatNaira(result.amount)} mono />
           <Row label="Sent" value={result.sentAt} />
           <Row label="Assigned agent" value={result.agent} />
+          <button
+            className="no-print"
+            onClick={() => window.print()}
+            style={{
+              marginTop: 16, width: '100%', padding: '9px', borderRadius: 10, border: '1px solid var(--divider)',
+              background: '#fff', fontSize: 12.5, fontWeight: 600, color: 'var(--navy)',
+            }}
+          >
+            🖨 Print this record
+          </button>
         </div>
       )}
     </div>

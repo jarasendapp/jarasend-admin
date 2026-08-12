@@ -62,10 +62,21 @@ export default function Analytics() {
 
   return (
     <div style={{ padding: 28 }}>
-      <h1 style={{ fontSize: 22, marginBottom: 4 }}>Analytics</h1>
-      <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0, marginBottom: 24 }}>
-        {loading ? 'Loading…' : 'Real registration and verification data.'}
-      </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: 22, marginBottom: 4 }}>Analytics</h1>
+          <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0, marginBottom: 24 }}>
+            {loading ? 'Loading…' : 'Real registration and verification data.'}
+          </p>
+        </div>
+        <button
+          className="no-print"
+          onClick={() => window.print()}
+          style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid var(--divider)', background: '#fff', fontSize: 12.5, fontWeight: 600, color: 'var(--navy)' }}
+        >
+          🖨 Print
+        </button>
+      </div>
 
       {error && (
         <div style={{ background: 'var(--error-tint)', color: 'var(--error)', borderRadius: 10, padding: '12px 14px', fontSize: 13, marginBottom: 20 }}>

@@ -1,3 +1,5 @@
+import TableToolbar from '../components/TableToolbar'
+
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
 }
@@ -27,9 +29,23 @@ export default function Settlement() {
             Reconciling what agents have paid out against what's been settled back to them.
           </p>
         </div>
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20, marginTop: 4 }}>
-          SAMPLE DATA
-        </span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className="no-print" style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20 }}>
+            SAMPLE DATA
+          </span>
+          <TableToolbar
+            filename="settlement"
+            rows={SAMPLE_SETTLEMENTS}
+            columns={[
+              { label: 'Agent', value: (s) => s.agent },
+              { label: 'Location', value: (s) => s.location },
+              { label: 'Owed', value: (s) => s.owed },
+              { label: 'Settled', value: (s) => s.settled },
+              { label: 'Outstanding', value: (s) => s.owed - s.settled },
+              { label: 'Status', value: (s) => s.status },
+            ]}
+          />
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, margin: '20px 0' }}>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import TableToolbar from '../components/TableToolbar'
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
@@ -33,9 +34,37 @@ export default function Wallets() {
             Personal wallet balances and agent float/commission.
           </p>
         </div>
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20, marginTop: 4 }}>
-          SAMPLE DATA
-        </span>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span className="no-print" style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20 }}>
+            SAMPLE DATA
+          </span>
+          {tab === 'personal' ? (
+            <TableToolbar
+              filename="personal-wallets"
+              rows={SAMPLE_PERSONAL_WALLETS}
+              columns={[
+                { label: 'Customer', value: (w) => w.name },
+                { label: 'Phone', value: (w) => w.phone },
+                { label: 'Available', value: (w) => w.available },
+                { label: 'Reserved', value: (w) => w.reserved },
+                { label: 'Reversed total', value: (w) => w.reversedTotal },
+              ]}
+            />
+          ) : (
+            <TableToolbar
+              filename="agent-wallets"
+              rows={SAMPLE_AGENT_WALLETS}
+              columns={[
+                { label: 'Agent', value: (w) => w.name },
+                { label: 'Location', value: (w) => w.location },
+                { label: 'Float', value: (w) => w.float },
+                { label: 'Commission balance', value: (w) => w.commission },
+                { label: 'Total cash received', value: (w) => w.received },
+                { label: 'Total cash withdrawn', value: (w) => w.withdrawn },
+              ]}
+            />
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, margin: '20px 0 18px' }}>
