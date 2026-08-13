@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import StatusBadge from '../components/StatusBadge'
 import { exportToCsv } from '../lib/exportCsv'
+import DetailModal, { DetailRow, DetailSectionLabel } from '../components/DetailModal'
 
 const KYC_STATUS_LABELS = {
   approved: 'Approved',
@@ -70,6 +71,47 @@ export default function PersonalAccounts() {
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   const [exporting, setExporting] = useState(false)
+
+  const [selectedId, setSelectedId] = useState(null)
+  const [detail, setDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(false)
+  const [detailError, setDetailError] = useState(null)
+
+  async function openDetail(userId) {
+    setSelectedId(userId)
+    setDetail(null)
+    setDetailError(null)
+    setDetailLoading(true)
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
+      if (profileError) throw profileError
+
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (walletError) throw walletError
+
+      const { data: kyc, error: kycError } = await supabase
+        .from('kyc_records')
+        .select('status, id_type, id_number, submitted_at')
+        .eq('user_id', userId)
+        .eq('role', 'personal')
+        .maybeSingle()
+      if (kycError) throw kycError
+
+      setDetail({ profile, wallet, kyc })
+    } catch (err) {
+      setDetailError(err.message || 'Could not load this account\'s details.')
+    } finally {
+      setDetailLoading(false)
+    }
+  }
 
   async function fetchAllForExport() {
     let query = supabase
@@ -166,7 +208,11 @@ export default function PersonalAccounts() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} style={{ borderBottom: '1px solid var(--divider)' }}>
+              <tr
+                key={r.id}
+                onClick={() => openDetail(r.id)}
+                style={{ borderBottom: '1px solid var(--divider)', cursor: 'pointer' }}
+              >
                 <td style={{ padding: '12px 16px', fontWeight: 600 }}>{r.full_name} {r.surname}</td>
                 <td style={{ padding: '12px 16px' }} className="mono">{r.phone}</td>
                 <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{r.email || '—'}</td>
@@ -207,6 +253,45 @@ export default function PersonalAccounts() {
           </div>
         </div>
       )}
+
+      {selectedId && (
+        <DetailModal
+          title={detail ? `${detail.profile.full_name} ${detail.profile.surname}` : 'Personal account details'}
+          onClose={() => setSelectedId(null)}
+          loading={detailLoading}
+          error={detailError}
+        >
+          {detail && (
+            <>
+              <DetailRow label="Phone" value={detail.profile.phone} mono />
+              <DetailRow label="Email" value={detail.profile.email || '—'} />
+              <DetailRow label="Date of birth" value={detail.profile.date_of_birth ? new Date(detail.profile.date_of_birth).toLocaleDateString() : '—'} />
+              <DetailRow label="Home address" value={formatAddress(detail.profile)} />
+              <DetailRow label="Joined" value={new Date(detail.profile.created_at).toLocaleDateString()} />
+
+              <DetailSectionLabel>KYC</DetailSectionLabel>
+              <DetailRow label="Status" value={<StatusBadge status={KYC_STATUS_LABELS[detail.kyc?.status] ?? 'Not started'} />} />
+              <DetailRow label="ID type" value={detail.kyc?.id_type || '—'} />
+              <DetailRow label="ID number" value={detail.kyc?.id_number || '—'} mono />
+
+              <DetailSectionLabel>Wallet</DetailSectionLabel>
+              <DetailRow label="Available" value={detail.wallet ? formatNaira(detail.wallet.available) : '—'} mono />
+              <DetailRow label="Reserved" value={detail.wallet ? formatNaira(detail.wallet.reserved) : '—'} mono />
+              <DetailRow label="Reversed total" value={detail.wallet ? formatNaira(detail.wallet.reversed_total) : '—'} mono />
+            </>
+          )}
+        </DetailModal>
+      )}
     </div>
   )
+}
+
+function formatAddress(profile) {
+  if (!profile) return '—'
+  const parts = [profile.house_number, profile.street_name, profile.town, profile.state, profile.country].filter(Boolean)
+  return parts.length ? parts.join(', ') : '—'
+}
+
+function formatNaira(n) {
+  return '₦' + Number(n).toLocaleString('en-NG')
 }
