@@ -55,6 +55,14 @@ a { text-decoration: none; color: inherit; }
   table {
     font-size: 11px !important;
   }
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .kyc-detail-panel {
+    overflow: visible !important;
+    height: auto !important;
+  }
 }
 .print-only {
   display: none;

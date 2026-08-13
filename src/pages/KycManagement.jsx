@@ -31,7 +31,7 @@ export default function KycManagement() {
 
       const userIds = [...new Set((kyc ?? []).map((k) => k.user_id))]
       const { data: profiles, error: profilesError } = userIds.length
-        ? await supabase.from('profiles').select('id, full_name, surname, phone, email').in('id', userIds)
+        ? await supabase.from('profiles').select('id, full_name, surname, phone, email, date_of_birth, house_number, street_name, town, state, country, business_name, business_house_number, business_street_name, business_town, business_state, business_country').in('id', userIds)
         : { data: [], error: null }
       if (profilesError) throw profilesError
 
@@ -138,7 +138,7 @@ export default function KycManagement() {
         </div>
       </div>
 
-      <div style={{ flex: 1, background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 24, overflowY: 'auto' }}>
+      <div className="kyc-detail-panel" style={{ flex: 1, background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 24, overflowY: 'auto' }}>
         {!selected ? (
           <div style={{ color: 'var(--slate)', fontSize: 13, textAlign: 'center', marginTop: 60 }}>
             Select a submission to review it.
@@ -201,6 +201,16 @@ function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
         <Field label="ID number" value={record.id_number} mono />
         <Field label="Submitted" value={new Date(record.submitted_at).toLocaleString()} />
         {isAgent && <Field label="Company registration number" value={record.company_reg_number || '—'} mono />}
+      </div>
+
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate)', letterSpacing: 0.3, textTransform: 'uppercase', margin: '4px 0 12px' }}>
+        Registration information
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+        <Field label="Date of birth" value={record.profile?.date_of_birth ? new Date(record.profile.date_of_birth).toLocaleDateString() : '—'} />
+        <Field label="Home address" value={formatAddress(record.profile, 'house_number', 'street_name', 'town', 'state', 'country')} />
+        {isAgent && <Field label="Business name" value={record.profile?.business_name || '—'} />}
+        {isAgent && <Field label="Business address" value={formatAddress(record.profile, 'business_house_number', 'business_street_name', 'business_town', 'business_state', 'business_country')} />}
       </div>
 
       {record.status !== 'pending' && (record.reviewed_by || record.rejection_reason) && (
@@ -318,6 +328,12 @@ function ConfirmDialog({ action, actioning, onCancel, onConfirm }) {
   )
 }
 
+function formatAddress(profile, houseKey, streetKey, townKey, stateKey, countryKey) {
+  if (!profile) return '—'
+  const parts = [profile[houseKey], profile[streetKey], profile[townKey], profile[stateKey], profile[countryKey]].filter(Boolean)
+  return parts.length ? parts.join(', ') : '—'
+}
+
 function Field({ label, value, mono, capitalize }) {
   return (
     <div>
@@ -361,17 +377,24 @@ function DocumentLightbox({ doc, onClose }) {
 function DocImage({ label, base64, onClick }) {
   return (
     <div>
-      <div
-        onClick={base64 ? onClick : undefined}
-        style={{
+      {base64 ? (
+        <img
+          src={`data:image/jpeg;base64,${base64}`}
+          alt={label}
+          onClick={onClick}
+          style={{
+            width: '100%', aspectRatio: '1', borderRadius: 10, border: '1px solid var(--divider)',
+            objectFit: 'cover', display: 'block', cursor: 'pointer',
+          }}
+        />
+      ) : (
+        <div style={{
           width: '100%', aspectRatio: '1', borderRadius: 10, border: '1px solid var(--divider)',
-          background: base64 ? `url(data:image/jpeg;base64,${base64}) center/cover` : '#F5F5F5',
-          display: base64 ? 'block' : 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: base64 ? 'pointer' : 'default',
-        }}
-      >
-        {!base64 && <span style={{ fontSize: 11, color: 'var(--slate)' }}>Not uploaded</span>}
-      </div>
+          background: '#F5F5F5', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <span style={{ fontSize: 11, color: 'var(--slate)' }}>Not uploaded</span>
+        </div>
+      )}
       <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 5 }}>{label}{base64 ? ' — click to view' : ''}</div>
     </div>
   )
