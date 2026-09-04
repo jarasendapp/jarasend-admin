@@ -103,7 +103,7 @@ export default function AgentAccounts() {
 
       const { data: kyc, error: kycError } = await supabase
         .from('kyc_records')
-        .select('status, id_type, id_number, company_reg_number, submitted_at')
+        .select('status, id_type, id_number, company_reg_number, bvn, bank_name, bank_account_number, bank_account_name, submitted_at')
         .eq('user_id', userId)
         .eq('role', 'agent')
         .maybeSingle()
@@ -295,7 +295,13 @@ export default function AgentAccounts() {
               <DetailRow label="Status" value={<StatusBadge status={KYC_STATUS_LABELS[detail.kyc?.status] ?? 'Not started'} />} />
               <DetailRow label="ID type" value={detail.kyc?.id_type || '—'} />
               <DetailRow label="ID number" value={detail.kyc?.id_number || '—'} mono />
+              <DetailRow label="BVN" value={detail.kyc?.bvn || '—'} mono />
               <DetailRow label="Company registration number" value={detail.kyc?.company_reg_number || '—'} mono />
+
+              <DetailSectionLabel>Bank details (withdrawal destination)</DetailSectionLabel>
+              <DetailRow label="Bank name" value={detail.kyc?.bank_name || '—'} />
+              <DetailRow label="Account number" value={detail.kyc?.bank_account_number || '—'} mono />
+              <DetailRow label="Account name" value={detail.kyc?.bank_account_name || '—'} />
 
               <DetailSectionLabel>Wallet</DetailSectionLabel>
               <DetailRow label="Float" value={detail.agentAccount ? formatNaira(detail.agentAccount.float) : '—'} mono />

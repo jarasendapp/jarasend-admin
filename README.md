@@ -31,14 +31,14 @@ Valid roles: `super_admin`, `finance_admin`, `support`, `compliance`, `operation
 
 ## Deployment (Firebase Hosting)
 
-This repo includes `.github/workflows/deploy.yml`, set up the same way as the mobile app's CI.
+This repo includes `.github/workflows/deploy.yml`, set up the same way as the mobile app's CI. Deploys to your project's default Hosting site — attach a custom domain to that site directly from the Firebase console whenever you're ready (Hosting → Add custom domain).
 
 1. **Firebase Hosting service account**: `firebase init hosting:github` from the Firebase CLI (or create one manually) — this generates a service account key
 2. Add three GitHub repo secrets (**Settings → Secrets and variables → Actions**):
    - `FIREBASE_SERVICE_ACCOUNT` — the JSON key from step 1
    - `SUPABASE_URL`
    - `SUPABASE_PUBLISHABLE_KEY`
-3. Edit `.github/workflows/deploy.yml` and `firebase.json` — replace `your-firebase-project-id` with your actual Firebase project ID
+3. Edit `.github/workflows/deploy.yml` — replace `your-firebase-project-id` with your actual Firebase project ID
 4. Push to `main` — the workflow builds and deploys automatically
 
 ## Database changes required

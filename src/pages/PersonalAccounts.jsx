@@ -99,7 +99,7 @@ export default function PersonalAccounts() {
 
       const { data: kyc, error: kycError } = await supabase
         .from('kyc_records')
-        .select('status, id_type, id_number, submitted_at')
+        .select('status, id_type, id_number, bvn, submitted_at')
         .eq('user_id', userId)
         .eq('role', 'personal')
         .maybeSingle()
@@ -273,6 +273,7 @@ export default function PersonalAccounts() {
               <DetailRow label="Status" value={<StatusBadge status={KYC_STATUS_LABELS[detail.kyc?.status] ?? 'Not started'} />} />
               <DetailRow label="ID type" value={detail.kyc?.id_type || '—'} />
               <DetailRow label="ID number" value={detail.kyc?.id_number || '—'} mono />
+              <DetailRow label="BVN" value={detail.kyc?.bvn || '—'} mono />
 
               <DetailSectionLabel>Wallet</DetailSectionLabel>
               <DetailRow label="Available" value={detail.wallet ? formatNaira(detail.wallet.available) : '—'} mono />

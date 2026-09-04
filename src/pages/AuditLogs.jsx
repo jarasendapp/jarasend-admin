@@ -9,7 +9,7 @@ const ACTION_LABELS = {
   kycStatusChanged: 'KYC status changed', moneySent: 'Money sent', payoutAuthorized: 'Payout authorized',
   withdrawal: 'Withdrawal', fraudAlert: 'Fraud alert', biometricEnabled: 'Biometric enabled',
   biometricLogin: 'Biometric login', sessionLocked: 'Session locked', verificationAttempt: 'Verification attempt',
-  transactionReversed: 'Transaction reversed',
+  transactionReversed: 'Transaction reversed', accountDeleted: 'Account deleted',
 }
 
 export default function AuditLogs() {

@@ -14,11 +14,8 @@ const SAMPLE_DAILY_TX = [
   { day: 'Mon', count: 42 }, { day: 'Tue', count: 58 }, { day: 'Wed', count: 51 },
   { day: 'Thu', count: 67 }, { day: 'Fri', count: 84 }, { day: 'Sat', count: 71 }, { day: 'Sun', count: 39 },
 ]
-const SAMPLE_GROSS_FEES = 284500          // 1% sender fee, summed — this is Total Revenue
-const SAMPLE_AGENT_COMMISSION = 96200     // total paid out to agents
 const SAMPLE_ANCHOR_FEES = 18200          // GetAnchor's per-transaction processing fee
 const SAMPLE_SMS_FEES = 4800              // SMS provider charges for redemption codes
-const SAMPLE_NET_REVENUE = SAMPLE_GROSS_FEES - SAMPLE_AGENT_COMMISSION - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES
 const SAMPLE_WALLET_TOTAL = 12480000
 const SAMPLE_PENDING_PICKUP = 18
 const SAMPLE_COMPLETED_PICKUP = 342
@@ -36,6 +33,7 @@ export default function Dashboard() {
     approvedCustomers: 0, approvedAgents: 0,
     rejectedCustomers: 0, rejectedAgents: 0,
     growthByMonth: [],
+    realGrossFees: 0, realOnboardingFees: 0, realAgentCommission: 0,
   })
 
   useEffect(() => {
@@ -55,6 +53,7 @@ export default function Dashboard() {
           { count: rejectedCustomers },
           { count: rejectedAgents },
           { data: recentProfiles },
+          { data: revenueRows, error: revenueError },
         ] = await Promise.all([
           supabase.from('profiles').select('*', { count: 'exact', head: true }).contains('roles', ['personal']),
           supabase.from('profiles').select('*', { count: 'exact', head: true }).contains('roles', ['agent']),
@@ -65,7 +64,9 @@ export default function Dashboard() {
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'personal').eq('status', 'rejected'),
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'agent').eq('status', 'rejected'),
           supabase.from('profiles').select('created_at').order('created_at', { ascending: true }),
+          supabase.from('company_revenue').select('type, amount'),
         ])
+        if (revenueError) throw revenueError
 
         if (cancelled) return
 
@@ -78,6 +79,10 @@ export default function Dashboard() {
         }
         const growthByMonth = Object.entries(monthCounts).map(([month, count]) => ({ month, count }))
 
+        const realGrossFees = (revenueRows ?? []).filter((r) => r.type === 'transaction_fee').reduce((sum, r) => sum + Number(r.amount), 0)
+        const realOnboardingFees = (revenueRows ?? []).filter((r) => r.type === 'onboarding_fee').reduce((sum, r) => sum + Number(r.amount), 0)
+        const realAgentCommission = (revenueRows ?? []).filter((r) => r.type === 'agent_commission').reduce((sum, r) => sum + Number(r.amount), 0)
+
         setStats({
           totalCustomers: totalCustomers ?? 0,
           totalAgents: totalAgents ?? 0,
@@ -88,6 +93,9 @@ export default function Dashboard() {
           rejectedCustomers: rejectedCustomers ?? 0,
           rejectedAgents: rejectedAgents ?? 0,
           growthByMonth,
+          realGrossFees,
+          realOnboardingFees,
+          realAgentCommission,
         })
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not load dashboard data.')
@@ -125,14 +133,22 @@ export default function Dashboard() {
         <KpiCard label="Rejected agents" value={loading ? '—' : stats.rejectedAgents} icon="✕" tint="gold" />
       </div>
 
-      <SectionLabel>Money & transactions — sample data (not yet centralized)</SectionLabel>
+      <SectionLabel>Money & transactions — fees & commission now live, rest still sample</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16, marginBottom: 14 }}>
-        <RevenueBreakdown />
+        <RevenueBreakdown realGrossFees={stats.realGrossFees} realOnboardingFees={stats.realOnboardingFees} realAgentCommission={stats.realAgentCommission} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <KpiCard label="Total wallet balance" value={formatNaira(SAMPLE_WALLET_TOTAL)} icon="💰" tint="navy" sample />
           <KpiCard label="Pending cash pickup" value={SAMPLE_PENDING_PICKUP} icon="⏳" tint="gold" sample />
           <KpiCard label="Completed cash pickup" value={SAMPLE_COMPLETED_PICKUP} icon="✅" tint="green" sample />
-          <KpiCard label="Net margin" value={((SAMPLE_NET_REVENUE / SAMPLE_GROSS_FEES) * 100).toFixed(1) + '%'} icon="📊" tint="green" sample />
+          <KpiCard
+            label="Net margin"
+            value={
+              stats.realGrossFees + stats.realOnboardingFees > 0
+                ? (((stats.realGrossFees + stats.realOnboardingFees - stats.realAgentCommission - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES) / (stats.realGrossFees + stats.realOnboardingFees)) * 100).toFixed(1) + '%'
+                : '—'
+            }
+            icon="📊" tint="green" sample
+          />
         </div>
       </div>
 
@@ -173,20 +189,24 @@ function SectionLabel({ children }) {
   )
 }
 
-function RevenueBreakdown() {
+function RevenueBreakdown({ realGrossFees, realOnboardingFees, realAgentCommission }) {
+  const totalRealRevenue = realGrossFees + realOnboardingFees
+  const netRevenue = totalRealRevenue - realAgentCommission - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES
+
   const rows = [
-    { label: 'Total revenue (gross fees collected)', value: SAMPLE_GROSS_FEES, kind: 'total' },
-    { label: 'Agent commission paid', value: -SAMPLE_AGENT_COMMISSION, kind: 'expense' },
-    { label: 'Anchor (GetAnchor) processing fees', value: -SAMPLE_ANCHOR_FEES, kind: 'expense' },
-    { label: 'SMS charges fees', value: -SAMPLE_SMS_FEES, kind: 'expense' },
+    { label: 'Transaction fees (1% per send)', value: realGrossFees, kind: 'total', live: true },
+    { label: 'Agent onboarding fees', value: realOnboardingFees, kind: 'total', live: true },
+    { label: 'Agent commission paid', value: -realAgentCommission, kind: 'expense', live: true },
+    { label: 'Anchor (GetAnchor) processing fees', value: -SAMPLE_ANCHOR_FEES, kind: 'expense', live: false },
+    { label: 'SMS charges fees', value: -SAMPLE_SMS_FEES, kind: 'expense', live: false },
   ]
 
   return (
     <div style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 20 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h3 style={{ fontSize: 14 }}>Revenue breakdown</h3>
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '2px 7px', borderRadius: 20 }}>
-          SAMPLE DATA
+        <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--slate)' }}>
+          Fees genuinely tracked live — commission/Anchor/SMS still sample
         </span>
       </div>
 
@@ -195,8 +215,15 @@ function RevenueBreakdown() {
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '9px 0', borderBottom: '1px solid var(--divider)',
         }}>
-          <span style={{ fontSize: 13, color: row.kind === 'total' ? 'var(--navy)' : 'var(--slate)', fontWeight: row.kind === 'total' ? 600 : 400 }}>
+          <span style={{ fontSize: 13, color: row.kind === 'total' ? 'var(--navy)' : 'var(--slate)', fontWeight: row.kind === 'total' ? 600 : 400, display: 'flex', alignItems: 'center', gap: 8 }}>
             {row.label}
+            <span style={{
+              fontSize: 8.5, fontWeight: 700, padding: '1px 6px', borderRadius: 20,
+              background: row.live ? 'var(--green-tint)' : 'var(--gold-tint)',
+              color: row.live ? 'var(--green-dark)' : '#854F0B',
+            }}>
+              {row.live ? 'LIVE' : 'SAMPLE'}
+            </span>
           </span>
           <span className="mono" style={{ fontSize: 13.5, fontWeight: 600, color: row.value < 0 ? 'var(--error)' : 'var(--navy)' }}>
             {row.value < 0 ? '–' : ''}{formatNaira(Math.abs(row.value))}
@@ -209,7 +236,7 @@ function RevenueBreakdown() {
           Total amount company made (after expenses)
         </span>
         <span className="mono" style={{ fontSize: 17, fontWeight: 700, color: 'var(--green-dark)' }}>
-          {formatNaira(SAMPLE_NET_REVENUE)}
+          {formatNaira(netRevenue)}
         </span>
       </div>
     </div>

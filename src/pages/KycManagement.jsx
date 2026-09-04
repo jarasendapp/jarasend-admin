@@ -199,6 +199,7 @@ function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
         <Field label="Role" value={record.role} capitalize />
         <Field label="ID type" value={record.id_type} />
         <Field label="ID number" value={record.id_number} mono />
+        <Field label="BVN" value={record.bvn || '—'} mono />
         <Field label="Submitted" value={new Date(record.submitted_at).toLocaleString()} />
         {isAgent && <Field label="Company registration number" value={record.company_reg_number || '—'} mono />}
       </div>
@@ -212,6 +213,19 @@ function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
         {isAgent && <Field label="Business name" value={record.profile?.business_name || '—'} />}
         {isAgent && <Field label="Business address" value={formatAddress(record.profile, 'business_house_number', 'business_street_name', 'business_town', 'business_state', 'business_country')} />}
       </div>
+
+      {isAgent && (
+        <>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate)', letterSpacing: 0.3, textTransform: 'uppercase', margin: '4px 0 12px' }}>
+            Bank details (withdrawal destination)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+            <Field label="Bank name" value={record.bank_name || '—'} />
+            <Field label="Account number" value={record.bank_account_number || '—'} mono />
+            <Field label="Account name" value={record.bank_account_name || '—'} />
+          </div>
+        </>
+      )}
 
       {record.status !== 'pending' && (record.reviewed_by || record.rejection_reason) && (
         <div style={{ background: 'var(--bg)', borderRadius: 10, padding: 14, marginBottom: 20 }}>
