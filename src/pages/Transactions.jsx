@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import StatusBadge from '../components/StatusBadge'
 import TableToolbar from '../components/TableToolbar'
 import PeriodDropdown, { filterByPeriod } from '../components/PeriodDropdown'
@@ -7,70 +8,98 @@ function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
 }
 
-// Sample data, using the ACTUAL TxType and TxStatus values from the
-// mobile app's entities.dart (send, receive, cashPickup, withdrawal /
+// Uses the ACTUAL TxType and TxStatus values from the mobile app's
+// entities.dart (send, receive, cashPickup, withdrawal, onboardingFee /
 // pendingCollection, collected, expired, cancelled, failed, reversed) —
-// not invented categories. Only the individual records are illustrative;
-// actual transaction volume needs centralized data, still offline today.
-const TYPE_LABELS = { send: 'Send', receive: 'Receive', cashPickup: 'Cash pickup', withdrawal: 'Withdrawal' }
+// not invented categories. Live data, mirrored from the app's own
+// offline transaction repository into the `transactions` table.
+const TYPE_LABELS = { send: 'Send', receive: 'Receive', cashPickup: 'Cash pickup', withdrawal: 'Withdrawal', onboardingFee: 'Onboarding fee' }
 const STATUS_MAP = {
   pendingCollection: 'Pending', collected: 'Completed', expired: 'Expired',
   cancelled: 'Reversed', failed: 'Reversed', reversed: 'Reversed',
 }
 
-const SAMPLE_TX = [
-  { ref: 'TX-88213', name: 'Blessing Nwachukwu', type: 'send', amount: 25000, fee: 250, status: 'collected', date: '2026-08-08 09:14' },
-  { ref: 'TX-88214', name: 'Emeka Obi', type: 'send', amount: 8000, fee: 80, status: 'collected', date: '2026-08-08 10:31' },
-  { ref: 'TX-88215', name: 'Fatima Bello', type: 'send', amount: 15000, fee: 150, status: 'pendingCollection', date: '2026-08-09 08:02' },
-  { ref: 'TX-88216', name: 'Chidi Okonkwo', type: 'withdrawal', amount: 200000, fee: 0, status: 'collected', date: '2026-08-09 09:20' },
-  { ref: 'TX-88217', name: 'Segun Adekunle', type: 'send', amount: 40000, fee: 400, status: 'expired', date: '2026-08-05 09:47' },
-  { ref: 'TX-88218', name: 'Amaka Eze', type: 'withdrawal', amount: 150000, fee: 0, status: 'collected', date: '2026-08-08 11:15' },
-  { ref: 'TX-88219', name: 'Ibrahim Musa', type: 'send', amount: 18000, fee: 180, status: 'reversed', date: '2026-08-02 10:00' },
-]
-
 export default function Transactions() {
+  const [transactions, setTransactions] = useState([])
+  const [profiles, setProfiles] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
   const [typeFilter, setTypeFilter] = useState('All')
   const [search, setSearch] = useState('')
   const [period, setPeriod] = useState('All time')
 
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .order('date_time', { ascending: false })
+        .limit(500)
+      if (error) throw error
+      setTransactions((data ?? []).map((t) => ({ ...t, amount: Number(t.amount), fee: Number(t.fee) })))
+
+      const userIds = [...new Set((data ?? []).map((t) => t.user_id))]
+      if (userIds.length) {
+        const { data: profileRows, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, surname')
+          .in('id', userIds)
+        if (profileError) throw profileError
+        setProfiles(Object.fromEntries((profileRows ?? []).map((p) => [p.id, `${p.full_name} ${p.surname}`])))
+      }
+    } catch (err) {
+      setLoadError(err.message || 'Could not load transactions.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const withNames = useMemo(
+    () => transactions.map((t) => ({ ...t, name: profiles[t.user_id] || t.user_id })),
+    [transactions, profiles],
+  )
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    const base = SAMPLE_TX.filter((t) => {
+    const base = withNames.filter((t) => {
       const matchesType = typeFilter === 'All' || t.type === typeFilter
-      const matchesSearch = !q || t.name.toLowerCase().includes(q) || t.ref.toLowerCase().includes(q)
+      const matchesSearch = !q || t.name.toLowerCase().includes(q) || t.reference.toLowerCase().includes(q)
       return matchesType && matchesSearch
     })
-    // Sample dates are 'YYYY-MM-DD HH:MM' strings - normalize to ISO
-    // (replace the space with 'T') for reliable cross-browser parsing.
-    return filterByPeriod(base, period, (t) => new Date(t.date.replace(' ', 'T')))
-  }, [typeFilter, search, period])
+    return filterByPeriod(base, period, (t) => new Date(t.date_time))
+  }, [withNames, typeFilter, search, period])
 
   return (
     <div style={{ padding: 28 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
           <h1 style={{ fontSize: 22, marginBottom: 4 }}>Transactions</h1>
-          <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0 }}>Every send, receive, pickup, and withdrawal.</p>
+          <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0 }}>Every send, receive, pickup, withdrawal, and onboarding fee.</p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <span className="no-print" style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20 }}>
-            SAMPLE DATA
-          </span>
           <TableToolbar
             filename="transactions"
             rows={filtered}
             columns={[
-              { label: 'Reference', value: (t) => t.ref },
+              { label: 'Reference', value: (t) => t.reference },
               { label: 'Account', value: (t) => t.name },
-              { label: 'Type', value: (t) => TYPE_LABELS[t.type] },
+              { label: 'Type', value: (t) => TYPE_LABELS[t.type] ?? t.type },
               { label: 'Amount', value: (t) => t.amount },
               { label: 'Fee', value: (t) => t.fee },
-              { label: 'Status', value: (t) => STATUS_MAP[t.status] },
-              { label: 'Date', value: (t) => t.date },
+              { label: 'Status', value: (t) => STATUS_MAP[t.status] ?? t.status },
+              { label: 'Date', value: (t) => t.date_time },
             ]}
           />
         </div>
       </div>
+
+      {loadError && (
+        <div style={{ padding: 14, background: '#FEF2F2', color: 'var(--error)', borderRadius: 10, fontSize: 13, margin: '16px 0' }}>{loadError}</div>
+      )}
 
       <div style={{ display: 'flex', gap: 8, margin: '20px 0 18px', flexWrap: 'wrap' }}>
         {['All', ...Object.keys(TYPE_LABELS)].map((t) => (
@@ -107,21 +136,22 @@ export default function Transactions() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((t) => (
-              <tr key={t.ref} style={{ borderBottom: '1px solid var(--divider)' }}>
-                <td style={{ padding: '12px 16px' }} className="mono">{t.ref}</td>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }}>{t.name}</td>
-                <td style={{ padding: '12px 16px' }}>{TYPE_LABELS[t.type]}</td>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }} className="mono">{formatNaira(t.amount)}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--slate)' }} className="mono">{formatNaira(t.fee)}</td>
-                <td style={{ padding: '12px 16px' }}><StatusBadge status={STATUS_MAP[t.status]} /></td>
-                <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{t.date}</td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>No transactions match this filter.</td>
-              </tr>
+            {loading ? (
+              <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>Loading…</td></tr>
+            ) : filtered.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>No transactions match this filter.</td></tr>
+            ) : (
+              filtered.map((t) => (
+                <tr key={t.reference} style={{ borderBottom: '1px solid var(--divider)' }}>
+                  <td style={{ padding: '12px 16px' }} className="mono">{t.reference}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{t.name}</td>
+                  <td style={{ padding: '12px 16px' }}>{TYPE_LABELS[t.type] ?? t.type}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600 }} className="mono">{formatNaira(t.amount)}</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--slate)' }} className="mono">{formatNaira(t.fee)}</td>
+                  <td style={{ padding: '12px 16px' }}><StatusBadge status={STATUS_MAP[t.status] ?? t.status} /></td>
+                  <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{new Date(t.date_time).toLocaleString()}</td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>

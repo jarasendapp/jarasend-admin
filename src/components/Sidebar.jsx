@@ -27,6 +27,7 @@ const NAV_GROUPS = [
       { to: '/wallets', label: 'Wallets' },
       { to: '/settlement', label: 'Settlement' },
       { to: '/commission', label: 'Commission' },
+      { to: '/account-change-requests', label: 'Account Change Requests' },
     ],
   },
   {

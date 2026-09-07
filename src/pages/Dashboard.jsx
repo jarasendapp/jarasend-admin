@@ -194,7 +194,7 @@ function RevenueBreakdown({ realGrossFees, realOnboardingFees, realAgentCommissi
   const netRevenue = totalRealRevenue - realAgentCommission - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES
 
   const rows = [
-    { label: 'Transaction fees (1% per send)', value: realGrossFees, kind: 'total', live: true },
+    { label: 'Transaction fees (1.020% per send)', value: realGrossFees, kind: 'total', live: true },
     { label: 'Agent onboarding fees', value: realOnboardingFees, kind: 'total', live: true },
     { label: 'Agent commission paid', value: -realAgentCommission, kind: 'expense', live: true },
     { label: 'Anchor (GetAnchor) processing fees', value: -SAMPLE_ANCHOR_FEES, kind: 'expense', live: false },

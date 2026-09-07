@@ -3,18 +3,18 @@ import TableToolbar from '../components/TableToolbar'
 
 // This is the ACTUAL formula from the mobile app's transaction repository
 // (calculateAgentCommission) — not an approximation. Below ₦5,000 sent,
-// no commission. From ₦5,000 up, ₦3 per ₦5,000 band. Kept identical here
-// so this page can never drift out of sync with what agents actually earn.
+// no commission. From ₦5,000 up, a flat ₦1 regardless of how much
+// above that threshold. Kept identical here so this page can never
+// drift out of sync with what agents actually earn.
 function calculateAgentCommission(amount) {
   if (amount < 5000) return 0
-  const band = Math.floor((amount - 5000) / 5000) + 1
-  return band * 3
+  return 1
 }
 
 const MIN_COMMISSION_WITHDRAWAL = 100
 
-function formatNaira(n) {
-  return '₦' + n.toLocaleString('en-NG')
+function formatNaira(n, decimals = 0) {
+  return '₦' + n.toLocaleString('en-NG', { minimumFractionDigits: decimals, maximumFractionDigits: Math.max(decimals, 2) })
 }
 
 // Sample aggregate figures — actual commission PAID totals require
@@ -47,7 +47,7 @@ export default function Commission() {
         <div style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 22 }}>
           <h3 style={{ fontSize: 14, marginBottom: 4 }}>Commission structure</h3>
           <p style={{ fontSize: 12, color: 'var(--slate)', marginTop: 0, marginBottom: 16 }}>
-            No commission below ₦5,000 sent. ₦3 per ₦5,000 band above that.
+            No commission below ₦5,000 sent. Flat ₦1 per transaction of ₦5,000 or more, regardless of how much above that.
           </p>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
