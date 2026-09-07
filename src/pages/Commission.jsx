@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
 import TableToolbar from '../components/TableToolbar'
 
 // This is the ACTUAL formula from the mobile app's transaction repository
@@ -17,24 +18,64 @@ function formatNaira(n, decimals = 0) {
   return '₦' + n.toLocaleString('en-NG', { minimumFractionDigits: decimals, maximumFractionDigits: Math.max(decimals, 2) })
 }
 
-// Sample aggregate figures — actual commission PAID totals require
-// centralized transaction data, which doesn't exist yet (still
-// offline/per-device). The band structure and rules above are real;
-// only the totals below are illustrative.
-const SAMPLE_TOP_EARNERS = [
-  { name: 'Chidi Okonkwo', location: 'Onitsha', paid: 18400 },
-  { name: 'Amaka Eze', location: 'Ikeja', paid: 15200 },
-  { name: 'Ibrahim Musa', location: 'Kano', paid: 12900 },
-  { name: 'Ngozi Adeyemi', location: 'Port Harcourt', paid: 11300 },
-  { name: 'Tunde Bakare', location: 'Ibadan', paid: 9800 },
-]
-const SAMPLE_TOTAL_PAID_THIS_MONTH = 96200
-
 const BAND_PREVIEW = [4999, 5000, 10000, 15000, 20000, 30000, 50000, 100000]
 
 export default function Commission() {
   const [calcAmount, setCalcAmount] = useState('')
   const calcResult = calcAmount ? calculateAgentCommission(Number(calcAmount)) : null
+
+  const [topEarners, setTopEarners] = useState([])
+  const [totalPaidThisMonth, setTotalPaidThisMonth] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => { load() }, [])
+
+  async function load() {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const monthStart = new Date()
+      monthStart.setDate(1)
+      monthStart.setHours(0, 0, 0, 0)
+
+      const { data: rows, error } = await supabase
+        .from('company_revenue')
+        .select('related_user_id, amount')
+        .eq('type', 'agent_commission')
+        .gte('created_at', monthStart.toISOString())
+      if (error) throw error
+
+      const totals = {}
+      for (const r of rows ?? []) {
+        totals[r.related_user_id] = (totals[r.related_user_id] ?? 0) + Number(r.amount)
+      }
+      const total = Object.values(totals).reduce((s, v) => s + v, 0)
+      setTotalPaidThisMonth(total)
+
+      const userIds = Object.keys(totals)
+      const { data: profileRows, error: profileError } = userIds.length
+        ? await supabase.from('profiles').select('id, full_name, surname, business_town').in('id', userIds)
+        : { data: [], error: null }
+      if (profileError) throw profileError
+      const profiles = Object.fromEntries((profileRows ?? []).map((p) => [p.id, p]))
+
+      const earners = userIds
+        .map((id) => ({
+          id,
+          name: profiles[id] ? `${profiles[id].full_name} ${profiles[id].surname}` : id,
+          location: profiles[id]?.business_town || '—',
+          paid: totals[id],
+        }))
+        .sort((a, b) => b.paid - a.paid)
+        .slice(0, 10)
+      setTopEarners(earners)
+    } catch (err) {
+      setLoadError(err.message || 'Could not load commission data.')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div style={{ padding: 28 }}>
@@ -96,13 +137,10 @@ export default function Commission() {
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '28px 0 14px' }}>
         <h3 style={{ fontSize: 14 }}>Top earning agents this month</h3>
-        <span className="no-print" style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '2px 7px', borderRadius: 20 }}>
-          SAMPLE DATA
-        </span>
         <div style={{ marginLeft: 'auto' }}>
           <TableToolbar
             filename="top-earning-agents"
-            rows={SAMPLE_TOP_EARNERS}
+            rows={topEarners}
             columns={[
               { label: 'Agent', value: (a) => a.name },
               { label: 'Location', value: (a) => a.location },
@@ -111,6 +149,9 @@ export default function Commission() {
           />
         </div>
       </div>
+      {loadError && (
+        <div style={{ padding: 14, background: '#FEF2F2', color: 'var(--error)', borderRadius: 10, fontSize: 13, marginBottom: 14 }}>{loadError}</div>
+      )}
       <div style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, overflow: 'hidden' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
           <thead>
@@ -121,16 +162,22 @@ export default function Commission() {
             </tr>
           </thead>
           <tbody>
-            {SAMPLE_TOP_EARNERS.map((a) => (
-              <tr key={a.name} style={{ borderBottom: '1px solid var(--divider)' }}>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }}>{a.name}</td>
-                <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{a.location}</td>
-                <td style={{ padding: '12px 16px', fontWeight: 600 }} className="mono">{formatNaira(a.paid)}</td>
-              </tr>
-            ))}
+            {loading ? (
+              <tr><td colSpan={3} style={{ padding: 24, textAlign: 'center', color: 'var(--slate)' }}>Loading…</td></tr>
+            ) : topEarners.length === 0 ? (
+              <tr><td colSpan={3} style={{ padding: 24, textAlign: 'center', color: 'var(--slate)' }}>No commission paid yet this month.</td></tr>
+            ) : (
+              topEarners.map((a) => (
+                <tr key={a.id} style={{ borderBottom: '1px solid var(--divider)' }}>
+                  <td style={{ padding: '12px 16px', fontWeight: 600 }}>{a.name}</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{a.location}</td>
+                  <td style={{ padding: '12px 16px', fontWeight: 600 }} className="mono">{formatNaira(a.paid, 2)}</td>
+                </tr>
+              ))
+            )}
             <tr>
               <td style={{ padding: '12px 16px', fontWeight: 700 }} colSpan={2}>Total paid this month</td>
-              <td style={{ padding: '12px 16px', fontWeight: 700 }} className="mono">{formatNaira(SAMPLE_TOTAL_PAID_THIS_MONTH)}</td>
+              <td style={{ padding: '12px 16px', fontWeight: 700 }} className="mono">{formatNaira(totalPaidThisMonth, 2)}</td>
             </tr>
           </tbody>
         </table>

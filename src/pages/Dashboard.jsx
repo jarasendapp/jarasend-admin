@@ -3,22 +3,12 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, R
 import { supabase } from '../lib/supabase'
 import KpiCard from '../components/KpiCard'
 
-// Sample data for Transactions, Wallets, and Revenue — these are NOT
-// wired to any real backend, because wallet/transaction data currently
-// lives only on individual devices (local storage), not centralized in
-// Supabase. This whole section will switch to real data once that
-// migration happens (planned alongside the GetAnchor banking integration).
-// Numbers below are illustrative only, to preview the shape of the real
-// section later.
-const SAMPLE_DAILY_TX = [
-  { day: 'Mon', count: 42 }, { day: 'Tue', count: 58 }, { day: 'Wed', count: 51 },
-  { day: 'Thu', count: 67 }, { day: 'Fri', count: 84 }, { day: 'Sat', count: 71 }, { day: 'Sun', count: 39 },
-]
+// Wallet balances, transaction counts, and revenue are now genuinely
+// live, pulled from Supabase. GetAnchor and SMS costs remain sample —
+// genuinely dependent on those third-party integrations, which aren't
+// built yet.
 const SAMPLE_ANCHOR_FEES = 18200          // GetAnchor's per-transaction processing fee
 const SAMPLE_SMS_FEES = 4800              // SMS provider charges for redemption codes
-const SAMPLE_WALLET_TOTAL = 12480000
-const SAMPLE_PENDING_PICKUP = 18
-const SAMPLE_COMPLETED_PICKUP = 342
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
@@ -34,6 +24,7 @@ export default function Dashboard() {
     rejectedCustomers: 0, rejectedAgents: 0,
     growthByMonth: [],
     realGrossFees: 0, realOnboardingFees: 0, realAgentCommission: 0,
+    realWalletTotal: 0, pendingPickup: 0, completedPickup: 0, dailyTx: [],
   })
 
   useEffect(() => {
@@ -54,6 +45,11 @@ export default function Dashboard() {
           { count: rejectedAgents },
           { data: recentProfiles },
           { data: revenueRows, error: revenueError },
+          { data: personalWallets, error: personalWalletsError },
+          { data: agentWallets, error: agentWalletsError },
+          { count: pendingPickup },
+          { count: completedPickup },
+          { data: recentTx, error: recentTxError },
         ] = await Promise.all([
           supabase.from('profiles').select('*', { count: 'exact', head: true }).contains('roles', ['personal']),
           supabase.from('profiles').select('*', { count: 'exact', head: true }).contains('roles', ['agent']),
@@ -65,8 +61,16 @@ export default function Dashboard() {
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'agent').eq('status', 'rejected'),
           supabase.from('profiles').select('created_at').order('created_at', { ascending: true }),
           supabase.from('company_revenue').select('type, amount'),
+          supabase.from('wallets').select('available'),
+          supabase.from('agent_accounts').select('float'),
+          supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'send').eq('status', 'pendingCollection'),
+          supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'send').eq('status', 'collected'),
+          supabase.from('transactions').select('date_time').eq('type', 'send').order('date_time', { ascending: false }).limit(1000),
         ])
         if (revenueError) throw revenueError
+        if (personalWalletsError) throw personalWalletsError
+        if (agentWalletsError) throw agentWalletsError
+        if (recentTxError) throw recentTxError
 
         if (cancelled) return
 
@@ -83,6 +87,20 @@ export default function Dashboard() {
         const realOnboardingFees = (revenueRows ?? []).filter((r) => r.type === 'onboarding_fee').reduce((sum, r) => sum + Number(r.amount), 0)
         const realAgentCommission = (revenueRows ?? []).filter((r) => r.type === 'agent_commission').reduce((sum, r) => sum + Number(r.amount), 0)
 
+        const realWalletTotal = (personalWallets ?? []).reduce((sum, w) => sum + Number(w.available), 0)
+          + (agentWallets ?? []).reduce((sum, a) => sum + Number(a.float), 0)
+
+        // Bucket the last 7 days of send transactions by day for the chart.
+        const dayCounts = {}
+        const dayOrder = []
+        for (const row of recentTx ?? []) {
+          const d = new Date(row.date_time)
+          const key = d.toLocaleDateString('en-US', { weekday: 'short' })
+          if (!(key in dayCounts)) dayOrder.push(key)
+          dayCounts[key] = (dayCounts[key] ?? 0) + 1
+        }
+        const dailyTx = dayOrder.slice(0, 7).reverse().map((day) => ({ day, count: dayCounts[day] }))
+
         setStats({
           totalCustomers: totalCustomers ?? 0,
           totalAgents: totalAgents ?? 0,
@@ -96,6 +114,10 @@ export default function Dashboard() {
           realGrossFees,
           realOnboardingFees,
           realAgentCommission,
+          realWalletTotal,
+          pendingPickup: pendingPickup ?? 0,
+          completedPickup: completedPickup ?? 0,
+          dailyTx,
         })
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not load dashboard data.')
@@ -137,9 +159,9 @@ export default function Dashboard() {
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16, marginBottom: 14 }}>
         <RevenueBreakdown realGrossFees={stats.realGrossFees} realOnboardingFees={stats.realOnboardingFees} realAgentCommission={stats.realAgentCommission} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-          <KpiCard label="Total wallet balance" value={formatNaira(SAMPLE_WALLET_TOTAL)} icon="💰" tint="navy" sample />
-          <KpiCard label="Pending cash pickup" value={SAMPLE_PENDING_PICKUP} icon="⏳" tint="gold" sample />
-          <KpiCard label="Completed cash pickup" value={SAMPLE_COMPLETED_PICKUP} icon="✅" tint="green" sample />
+          <KpiCard label="Total wallet balance" value={formatNaira(stats.realWalletTotal)} icon="💰" tint="navy" />
+          <KpiCard label="Pending cash pickup" value={stats.pendingPickup} icon="⏳" tint="gold" />
+          <KpiCard label="Completed cash pickup" value={stats.completedPickup} icon="✅" tint="green" />
           <KpiCard
             label="Net margin"
             value={
@@ -165,9 +187,9 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </ChartCard>
 
-        <ChartCard title="Daily transaction trend (last 7 days)" sample>
+        <ChartCard title="Daily transaction trend (last 7 days)" sample={false}>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={SAMPLE_DAILY_TX}>
+            <BarChart data={stats.dailyTx}>
               <CartesianGrid stroke="#F0F2F5" vertical={false} />
               <XAxis dataKey="day" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
