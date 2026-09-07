@@ -1,46 +1,76 @@
 import { useState } from 'react'
+import { supabase } from '../lib/supabase'
 import StatusBadge from '../components/StatusBadge'
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
 }
 
-// Sample data — same underlying records as Cash Pickup, but this page
-// is purpose-built as a quick lookup tool for support staff verifying a
-// single code, not a browsable table of everything.
-const SAMPLE_CODES = {
-  '482913': { receiverMobile: '0803 214 7765', amount: 25000, sentAt: '2026-08-08 09:14', status: 'Completed', agent: 'Chidi Okonkwo — Onitsha' },
-  '117745': { receiverMobile: '0706 552 8801', amount: 8000, sentAt: '2026-08-08 10:31', status: 'Completed', agent: 'Amaka Eze — Ikeja' },
-  '590214': { receiverMobile: '0912 340 6612', amount: 15000, sentAt: '2026-08-09 08:02', status: 'Pending', agent: '—' },
-  '204558': { receiverMobile: '0703 991 4456', amount: 12000, sentAt: '2026-08-06 14:20', status: 'Unclaimed', agent: '—' },
-  '845290': { receiverMobile: '0902 118 7734', amount: 20000, sentAt: '2026-07-28 11:10', status: 'Expired', agent: '—' },
-  '763418': { receiverMobile: '0813 227 6650', amount: 18000, sentAt: '2026-08-02 10:00', status: 'Reversed', agent: '—' },
+const STATUS_MAP = {
+  pendingCollection: 'Pending', collected: 'Completed', expired: 'Expired',
+  cancelled: 'Reversed', failed: 'Reversed', reversed: 'Reversed',
+}
+
+// Hashes the entered code with SHA-256, matching the mobile app's own
+// hashing exactly (sha256.convert(utf8.encode(value)).toString()) — the
+// plaintext code is never stored anywhere, including here. This only
+// lets us confirm whether a code someone reads out over the phone
+// matches a real transaction, the same way a system verifies a PIN
+// without ever displaying it.
+async function sha256Hex(value) {
+  const bytes = new TextEncoder().encode(value)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 export default function ClaimCodes() {
   const [query, setQuery] = useState('')
   const [result, setResult] = useState(null)
   const [searched, setSearched] = useState(false)
+  const [searching, setSearching] = useState(false)
+  const [profiles, setProfiles] = useState({})
 
-  function handleSearch(e) {
+  async function handleSearch(e) {
     e.preventDefault()
     const code = query.trim()
-    setResult(SAMPLE_CODES[code] ?? null)
-    setSearched(true)
+    if (!code) return
+    setSearching(true)
+    setSearched(false)
+    try {
+      const hash = await sha256Hex(code)
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('pickup_code_hash', hash)
+        .maybeSingle()
+      if (error) throw error
+      setResult(data)
+
+      if (data) {
+        const userIds = [data.user_id, data.agent_id].filter(Boolean)
+        const { data: profileRows } = await supabase
+          .from('profiles')
+          .select('id, full_name, surname, business_name')
+          .in('id', userIds)
+        setProfiles(Object.fromEntries((profileRows ?? []).map((p) => [p.id, p])))
+      }
+    } catch (err) {
+      setResult(null)
+    } finally {
+      setSearching(false)
+      setSearched(true)
+    }
   }
+
+  const agentProfile = result?.agent_id ? profiles[result.agent_id] : null
 
   return (
     <div style={{ padding: 28 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <div>
-          <h1 style={{ fontSize: 22, marginBottom: 4 }}>Claim codes</h1>
-          <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0 }}>
-            Look up a single redemption code — useful when a customer or agent calls in about one.
-          </p>
-        </div>
-        <span style={{ fontSize: 9.5, fontWeight: 700, background: 'var(--gold-tint)', color: '#854F0B', padding: '3px 9px', borderRadius: 20, marginTop: 4 }}>
-          SAMPLE DATA
-        </span>
+      <div>
+        <h1 style={{ fontSize: 22, marginBottom: 4 }}>Claim codes</h1>
+        <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0 }}>
+          Look up a single redemption code — useful when a customer or agent calls in about one. The code itself is never stored or shown here — only whether it matches.
+        </p>
       </div>
 
       <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10, margin: '20px 0', maxWidth: 420 }}>
@@ -53,9 +83,10 @@ export default function ClaimCodes() {
         />
         <button
           type="submit"
+          disabled={searching}
           style={{ padding: '11px 22px', borderRadius: 10, border: 'none', background: 'var(--navy)', color: '#fff', fontWeight: 600, fontSize: 13.5 }}
         >
-          Look up
+          {searching ? 'Looking up…' : 'Look up'}
         </button>
       </form>
 
@@ -68,13 +99,13 @@ export default function ClaimCodes() {
       {result && (
         <div style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 22, maxWidth: 420 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <span className="mono" style={{ fontSize: 18, fontWeight: 700 }}>{query.trim()}</span>
-            <StatusBadge status={result.status} />
+            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)' }}>✓ Code matches this transaction</span>
+            <StatusBadge status={STATUS_MAP[result.status] ?? result.status} />
           </div>
-          <Row label="Receiver mobile" value={result.receiverMobile} mono />
-          <Row label="Amount" value={formatNaira(result.amount)} mono />
-          <Row label="Sent" value={result.sentAt} />
-          <Row label="Assigned agent" value={result.agent} />
+          <Row label="Receiver mobile" value={result.counterparty_mobile || '—'} mono />
+          <Row label="Amount" value={formatNaira(Number(result.amount))} mono />
+          <Row label="Sent" value={new Date(result.date_time).toLocaleString()} />
+          <Row label="Assigned agent" value={agentProfile ? `${agentProfile.full_name} ${agentProfile.surname}${agentProfile.business_name ? ` — ${agentProfile.business_name}` : ''}` : '—'} />
           <button
             className="no-print"
             onClick={() => window.print()}
