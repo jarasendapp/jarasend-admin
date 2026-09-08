@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import StatusBadge from '../components/StatusBadge'
 import { exportToCsv } from '../lib/exportCsv'
 import DetailModal, { DetailRow, DetailSectionLabel } from '../components/DetailModal'
+import AccountLockPanel from '../components/AccountLockPanel'
 
 const KYC_STATUS_LABELS = {
   approved: 'Approved',
@@ -279,6 +280,9 @@ export default function PersonalAccounts() {
               <DetailRow label="Available" value={detail.wallet ? formatNaira(detail.wallet.available) : '—'} mono />
               <DetailRow label="Reserved" value={detail.wallet ? formatNaira(detail.wallet.reserved) : '—'} mono />
               <DetailRow label="Reversed total" value={detail.wallet ? formatNaira(detail.wallet.reversed_total) : '—'} mono />
+
+              <DetailSectionLabel>Account status</DetailSectionLabel>
+              <AccountLockPanel userId={selectedId} role="personal" />
             </>
           )}
         </DetailModal>

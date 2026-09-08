@@ -257,6 +257,10 @@ function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
         {isAgent && <DocImage label="Company registration certificate" base64={record.company_reg_cert_base64} onClick={() => onViewDocument('Company registration certificate', record.company_reg_cert_base64)} />}
       </div>
 
+      {record.status === 'approved' && (
+        <ResubmissionPanel record={record} />
+      )}
+
       {record.status === 'pending' && (
         <div style={{ display: 'flex', gap: 10 }}>
           <button
@@ -410,6 +414,106 @@ function DocImage({ label, base64, onClick }) {
         </div>
       )}
       <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 5 }}>{label}{base64 ? ' — click to view' : ''}</div>
+    </div>
+  )
+}
+
+// Lets an admin flag an already-approved KYC record for resubmission —
+// e.g. a blurry ID photo discovered after approval — without reverting
+// the whole record to pending/rejected. Shown only when record.status
+// is 'approved'.
+function ResubmissionPanel({ record }) {
+  const [note, setNote] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [flagged, setFlagged] = useState(record.needs_resubmission)
+  const [savedNote, setSavedNote] = useState(record.resubmission_note)
+
+  async function submit() {
+    if (!note.trim()) return
+    setBusy(true)
+    setError('')
+    try {
+      const { error: err } = await supabase.from('kyc_records').update({
+        needs_resubmission: true,
+        resubmission_note: note.trim(),
+        resubmission_requested_at: new Date().toISOString(),
+      }).eq('user_id', record.user_id).eq('role', record.role)
+      if (err) throw err
+      setFlagged(true)
+      setSavedNote(note.trim())
+      setShowForm(false)
+      setNote('')
+    } catch (e) {
+      setError(e.message || 'Could not flag this record for resubmission.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function clear() {
+    setBusy(true)
+    setError('')
+    try {
+      const { error: err } = await supabase.from('kyc_records').update({
+        needs_resubmission: false, resubmission_note: null,
+      }).eq('user_id', record.user_id).eq('role', record.role)
+      if (err) throw err
+      setFlagged(false)
+      setSavedNote(null)
+    } catch (e) {
+      setError(e.message || 'Could not clear the resubmission flag.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate)', letterSpacing: 0.3, textTransform: 'uppercase', marginBottom: 10 }}>
+        Request resubmission
+      </div>
+
+      {error && (
+        <div style={{ background: 'var(--error-tint)', color: 'var(--error)', borderRadius: 10, padding: '9px 12px', fontSize: 12.5, marginBottom: 10 }}>{error}</div>
+      )}
+
+      {flagged ? (
+        <div style={{ background: 'var(--gold-tint)', borderRadius: 12, padding: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#854F0B', marginBottom: 6 }}>⏳ Resubmission requested</div>
+          <div style={{ fontSize: 12.5, color: 'var(--text)', marginBottom: 10 }}>{savedNote}</div>
+          <button onClick={clear} disabled={busy} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid var(--divider)', background: '#fff', fontSize: 12, fontWeight: 600 }}>
+            {busy ? 'Working…' : 'Clear this request'}
+          </button>
+        </div>
+      ) : showForm ? (
+        <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 14 }}>
+          <label style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate)' }}>What needs to be redone (shown to the user)</label>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            rows={3}
+            style={{ width: '100%', marginTop: 6, padding: 10, borderRadius: 8, border: '1px solid var(--divider)', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+            placeholder="e.g. Your ID photo is too blurry to read — please retake it in good lighting."
+          />
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <button onClick={submit} disabled={busy || !note.trim()} style={{ padding: '8px 16px', borderRadius: 10, border: 'none', background: 'var(--navy)', color: '#fff', fontSize: 12.5, fontWeight: 600 }}>
+              {busy ? 'Sending…' : 'Request resubmission'}
+            </button>
+            <button onClick={() => { setShowForm(false); setNote('') }} style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid var(--divider)', background: '#fff', fontSize: 12.5, fontWeight: 600 }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowForm(true)}
+          style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid var(--divider)', background: '#fff', color: 'var(--navy)', fontSize: 12.5, fontWeight: 600 }}
+        >
+          Flag a document for resubmission
+        </button>
+      )}
     </div>
   )
 }

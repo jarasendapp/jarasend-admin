@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import StatusBadge from '../components/StatusBadge'
 import { exportToCsv } from '../lib/exportCsv'
 import DetailModal, { DetailRow, DetailSectionLabel } from '../components/DetailModal'
+import AccountLockPanel from '../components/AccountLockPanel'
 
 const KYC_STATUS_LABELS = {
   approved: 'Approved',
@@ -308,6 +309,9 @@ export default function AgentAccounts() {
               <DetailRow label="Commission balance" value={detail.agentAccount ? formatNaira(detail.agentAccount.commission) : '—'} mono />
               <DetailRow label="Total cash received" value={detail.agentAccount ? formatNaira(detail.agentAccount.total_cash_received) : '—'} mono />
               <DetailRow label="Total cash withdrawn" value={detail.agentAccount ? formatNaira(detail.agentAccount.total_cash_withdrawn) : '—'} mono />
+
+              <DetailSectionLabel>Account status</DetailSectionLabel>
+              <AccountLockPanel userId={selectedId} role="agent" />
             </>
           )}
         </DetailModal>
