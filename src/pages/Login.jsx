@@ -32,12 +32,7 @@ export default function Login() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'var(--navy)', gap: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <img src="/jarasend_icon.png" alt="" style={{ width: 56, height: 56, borderRadius: 14 }} />
-        <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: 26, color: '#fff' }}>
-          Jara<span style={{ color: 'var(--gold)' }}>Send</span>
-        </span>
-      </div>
+      <img src="/jarasend_wordmark.png" alt="JaraSend" style={{ height: 48, width: 'auto' }} />
       <div style={{ width: 380, background: '#fff', borderRadius: 16, padding: 36 }}>
         <h1 style={{ fontSize: 18, marginBottom: 4 }}>Admin sign in</h1>
         <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0, marginBottom: 28 }}>

@@ -106,7 +106,13 @@ export default function PersonalAccounts() {
         .maybeSingle()
       if (kycError) throw kycError
 
-      setDetail({ profile, wallet, kyc })
+      const { data: anchor } = await supabase
+        .from('anchor_accounts')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      setDetail({ profile, wallet, kyc, anchor })
     } catch (err) {
       setDetailError(err.message || 'Could not load this account\'s details.')
     } finally {
@@ -280,6 +286,17 @@ export default function PersonalAccounts() {
               <DetailRow label="Available" value={detail.wallet ? formatNaira(detail.wallet.available) : '—'} mono />
               <DetailRow label="Reserved" value={detail.wallet ? formatNaira(detail.wallet.reserved) : '—'} mono />
               <DetailRow label="Reversed total" value={detail.wallet ? formatNaira(detail.wallet.reversed_total) : '—'} mono />
+
+              <DetailSectionLabel>Anchor (real banking)</DetailSectionLabel>
+              {detail.anchor ? (
+                <>
+                  <DetailRow label="Virtual account number" value={detail.anchor.virtual_account_number || '—'} mono />
+                  <DetailRow label="Virtual account bank" value={detail.anchor.virtual_bank_name || '—'} />
+                  <DetailRow label="Verified" value={detail.anchor.verified ? 'Yes' : 'No'} />
+                </>
+              ) : (
+                <p style={{ fontSize: 12.5, color: 'var(--slate)' }}>Not set up yet — this account hasn't funded its wallet via Anchor.</p>
+              )}
 
               <DetailSectionLabel>Account status</DetailSectionLabel>
               <AccountLockPanel userId={selectedId} role="personal" />

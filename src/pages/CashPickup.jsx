@@ -144,7 +144,7 @@ export default function CashPickup() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
           <thead>
             <tr style={{ background: '#FAFBFC', borderBottom: '1px solid var(--divider)' }}>
-              {['Receiver mobile', 'Amount sent', 'Reference', 'Sent (date & time)', 'Assigned agent', 'Status'].map((h) => (
+              {['Receiver mobile', 'Amount sent', 'Reference', 'Sent (date & time)', 'Assigned agent', 'Status', 'Claim SMS'].map((h) => (
                 <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontWeight: 700, color: 'var(--slate)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>
                   {h}
                 </th>
@@ -165,6 +165,11 @@ export default function CashPickup() {
                   <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{new Date(p.date_time).toLocaleString()}</td>
                   <td style={{ padding: '12px 16px' }}>{p.agentName}</td>
                   <td style={{ padding: '12px 16px' }}><StatusBadge status={p.statusLabel} /></td>
+                  <td style={{ padding: '12px 16px', fontSize: 12 }}>
+                    {p.claim_sms_sent === true ? <span style={{ color: 'var(--green-dark)' }}>✓ Sent</span> :
+                     p.claim_sms_sent === false ? <span style={{ color: 'var(--error)' }}>✗ Failed</span> :
+                     <span style={{ color: 'var(--slate)' }}>—</span>}
+                  </td>
                 </tr>
               ))
             )}

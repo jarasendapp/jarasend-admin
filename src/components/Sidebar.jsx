@@ -64,11 +64,8 @@ export default function Sidebar() {
       display: 'flex', flexDirection: 'column', position: 'sticky', top: 0,
       height: '100vh', overflowY: 'auto',
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '0 6px 22px' }}>
-        <img src="/jarasend_icon.png" alt="" style={{ width: 26, height: 26, borderRadius: 7, flexShrink: 0 }} />
-        <span style={{ fontFamily: 'Poppins, sans-serif', fontWeight: 600, fontSize: 17, color: '#fff' }}>
-          Jara<span style={{ color: 'var(--gold)' }}>Send</span>
-        </span>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '0 6px 22px' }}>
+        <img src="/jarasend_wordmark.png" alt="JaraSend" style={{ height: 26, width: 'auto' }} />
       </div>
 
       {NAV_GROUPS.map((group) => {

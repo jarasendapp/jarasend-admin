@@ -204,6 +204,25 @@ function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
         {isAgent && <Field label="Company registration number" value={record.company_reg_number || '—'} mono />}
       </div>
 
+      {(record.dojah_bvn_checked || record.dojah_nin_checked) && (
+        <>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate)', letterSpacing: 0.3, textTransform: 'uppercase', margin: '4px 0 12px' }}>
+            Dojah verification report
+          </div>
+          <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 14, marginBottom: 20 }}>
+            {record.dojah_bvn_checked && (
+              <DojahReportRow label="BVN" matched={record.dojah_bvn_matched} name={record.dojah_bvn_name} error={record.dojah_bvn_error} />
+            )}
+            {record.dojah_nin_checked && (
+              <DojahReportRow label="NIN" matched={record.dojah_nin_matched} name={record.dojah_nin_name} error={record.dojah_nin_error} />
+            )}
+            <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 8 }}>
+              Informational only — doesn't affect approval. Review and decide below.
+            </div>
+          </div>
+        </>
+      )}
+
       <div style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--slate)', letterSpacing: 0.3, textTransform: 'uppercase', margin: '4px 0 12px' }}>
         Registration information
       </div>
@@ -514,6 +533,22 @@ function ResubmissionPanel({ record }) {
           Flag a document for resubmission
         </button>
       )}
+    </div>
+  )
+}
+
+// One line of the Dojah verification report - shows whether the
+// provided BVN/NIN matched Dojah's records, the name on file if
+// returned, or the error if the lookup itself failed.
+function DojahReportRow({ label, matched, name, error }) {
+  const color = error ? 'var(--error)' : matched ? 'var(--green-dark)' : 'var(--error)'
+  const icon = error ? '⚠️' : matched ? '✅' : '❌'
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12.5 }}>
+      <span style={{ fontWeight: 600 }}>{label}</span>
+      <span style={{ color }}>
+        {icon} {error ? error : matched ? `Matched${name ? ` — ${name}` : ''}` : 'No match found'}
+      </span>
     </div>
   )
 }

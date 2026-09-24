@@ -130,16 +130,16 @@ export default function Transactions() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
           <thead>
             <tr style={{ background: '#FAFBFC', borderBottom: '1px solid var(--divider)' }}>
-              {['Reference', 'Account', 'Type', 'Amount', 'Fee', 'Status', 'Date'].map((h) => (
+              {['Reference', 'Account', 'Type', 'Amount', 'Fee', 'Status', 'Date', 'Claim SMS'].map((h) => (
                 <th key={h} style={{ textAlign: 'left', padding: '11px 16px', fontWeight: 700, color: 'var(--slate)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.3 }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>Loading…</td></tr>
+              <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>Loading…</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={7} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>No transactions match this filter.</td></tr>
+              <tr><td colSpan={8} style={{ padding: 32, textAlign: 'center', color: 'var(--slate)' }}>No transactions match this filter.</td></tr>
             ) : (
               filtered.map((t) => (
                 <tr key={t.reference} style={{ borderBottom: '1px solid var(--divider)' }}>
@@ -150,6 +150,11 @@ export default function Transactions() {
                   <td style={{ padding: '12px 16px', color: 'var(--slate)' }} className="mono">{formatNaira(t.fee)}</td>
                   <td style={{ padding: '12px 16px' }}><StatusBadge status={STATUS_MAP[t.status] ?? t.status} /></td>
                   <td style={{ padding: '12px 16px', color: 'var(--slate)' }}>{new Date(t.date_time).toLocaleString()}</td>
+                  <td style={{ padding: '12px 16px', fontSize: 12 }}>
+                    {t.claim_sms_sent === true ? <span style={{ color: 'var(--green-dark)' }}>✓ Sent</span> :
+                     t.claim_sms_sent === false ? <span style={{ color: 'var(--error)' }}>✗ Failed</span> :
+                     <span style={{ color: 'var(--slate)' }}>—</span>}
+                  </td>
                 </tr>
               ))
             )}

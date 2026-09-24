@@ -1,7 +1,7 @@
 // The address every "Contact support" click routes to. Update this one
 // line whenever the designated support inbox is finalized — every button
 // on this page reads from here, so there's only one place to change.
-const SUPPORT_EMAIL = 'support@jarasend.name.ng'
+const SUPPORT_EMAIL = 'support@jarasendapp.com.ng'
 
 export default function Support() {
   return (
