@@ -65,7 +65,7 @@ export default function CashPickup() {
   }
 
   const withAgentNames = useMemo(
-    () => pickups.map((p) => ({ ...p, agentName: p.agent_id ? (profiles[p.agent_id] || p.agent_id) : '—', statusLabel: STATUS_MAP[p.status] ?? p.status })),
+    () => pickups.map((p) => ({ ...p, agentName: p.agent_id ? (p.agent_name_snapshot || profiles[p.agent_id] || 'Deleted user') : '—', statusLabel: STATUS_MAP[p.status] ?? p.status })),
     [pickups, profiles],
   )
 

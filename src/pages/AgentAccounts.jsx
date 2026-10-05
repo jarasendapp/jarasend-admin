@@ -4,6 +4,7 @@ import StatusBadge from '../components/StatusBadge'
 import { exportToCsv } from '../lib/exportCsv'
 import DetailModal, { DetailRow, DetailSectionLabel } from '../components/DetailModal'
 import AccountLockPanel from '../components/AccountLockPanel'
+import { DojahReportRow } from './KycManagement'
 
 const KYC_STATUS_LABELS = {
   approved: 'Approved',
@@ -104,7 +105,7 @@ export default function AgentAccounts() {
 
       const { data: kyc, error: kycError } = await supabase
         .from('kyc_records')
-        .select('status, id_type, id_number, company_reg_number, bvn, bank_name, bank_account_number, bank_account_name, submitted_at')
+        .select('status, id_type, id_number, company_reg_number, bvn, gender, bank_name, bank_account_number, bank_account_name, submitted_at, dojah_bvn_checked, dojah_bvn_matched, dojah_bvn_face_match, dojah_bvn_face_confidence, dojah_bvn_name, dojah_bvn_error, dojah_nin_checked, dojah_nin_matched, dojah_nin_face_match, dojah_nin_face_confidence, dojah_nin_name, dojah_nin_error')
         .eq('user_id', userId)
         .eq('role', 'agent')
         .maybeSingle()
@@ -303,7 +304,22 @@ export default function AgentAccounts() {
               <DetailRow label="ID type" value={detail.kyc?.id_type || '—'} />
               <DetailRow label="ID number" value={detail.kyc?.id_number || '—'} mono />
               <DetailRow label="BVN" value={detail.kyc?.bvn || '—'} mono />
+              <DetailRow label="Gender" value={detail.kyc?.gender ? detail.kyc.gender.charAt(0).toUpperCase() + detail.kyc.gender.slice(1) : '—'} />
               <DetailRow label="Company registration number" value={detail.kyc?.company_reg_number || '—'} mono />
+
+              {(detail.kyc?.dojah_bvn_checked || detail.kyc?.dojah_nin_checked) && (
+                <>
+                  <DetailSectionLabel>Dojah verification report</DetailSectionLabel>
+                  <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 14, marginBottom: 20 }}>
+                    {detail.kyc.dojah_bvn_checked && (
+                      <DojahReportRow label="BVN" matched={detail.kyc.dojah_bvn_matched} faceMatch={detail.kyc.dojah_bvn_face_match} faceConfidence={detail.kyc.dojah_bvn_face_confidence} name={detail.kyc.dojah_bvn_name} error={detail.kyc.dojah_bvn_error} />
+                    )}
+                    {detail.kyc.dojah_nin_checked && (
+                      <DojahReportRow label="NIN" matched={detail.kyc.dojah_nin_matched} faceMatch={detail.kyc.dojah_nin_face_match} faceConfidence={detail.kyc.dojah_nin_face_confidence} name={detail.kyc.dojah_nin_name} error={detail.kyc.dojah_nin_error} />
+                    )}
+                  </div>
+                </>
+              )}
 
               <DetailSectionLabel>Bank details (withdrawal destination)</DetailSectionLabel>
               <DetailRow label="Bank name" value={detail.kyc?.bank_name || '—'} />

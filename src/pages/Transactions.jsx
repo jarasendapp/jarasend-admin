@@ -59,7 +59,7 @@ export default function Transactions() {
   }
 
   const withNames = useMemo(
-    () => transactions.map((t) => ({ ...t, name: profiles[t.user_id] || t.user_id })),
+    () => transactions.map((t) => ({ ...t, name: t.sender_name_snapshot || profiles[t.user_id] || 'Deleted user' })),
     [transactions, profiles],
   )
 

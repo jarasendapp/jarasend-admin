@@ -216,7 +216,7 @@ function KudiSmsCard() {
       try {
         const { data: rows, error: err } = await supabase
           .from('transactions')
-          .select('claim_sms_sent, date_time')
+          .select('claim_sms_sent, claim_sms_error, date_time')
           .not('claim_sms_sent', 'is', null)
           .order('date_time', { ascending: false })
           .limit(50)
@@ -244,6 +244,9 @@ function KudiSmsCard() {
             <span style={{ fontSize: 12.5, fontWeight: 600 }}>Most recent — {stats.latest?.claim_sms_sent ? 'delivered' : 'failed'}</span>
           </div>
           <p style={{ fontSize: 11.5, color: 'var(--slate)', margin: 0 }}>{new Date(stats.latest.date_time).toLocaleString()}</p>
+          {!stats.latest?.claim_sms_sent && stats.latest?.claim_sms_error && (
+            <p style={{ fontSize: 11.5, color: 'var(--error)', marginTop: 6 }}>{stats.latest.claim_sms_error}</p>
+          )}
         </>
       ) : (
         <p style={{ fontSize: 12, color: 'var(--slate)' }}>No SMS deliveries recorded yet.</p>

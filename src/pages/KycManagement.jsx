@@ -200,6 +200,7 @@ function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
         <Field label="ID type" value={record.id_type} />
         <Field label="ID number" value={record.id_number} mono />
         <Field label="BVN" value={record.bvn || '—'} mono />
+        <Field label="Gender" value={record.gender || '—'} capitalize />
         <Field label="Submitted" value={new Date(record.submitted_at).toLocaleString()} />
         {isAgent && <Field label="Company registration number" value={record.company_reg_number || '—'} mono />}
       </div>
@@ -211,13 +212,13 @@ function KycDetail({ record, onRequestDecision, actionError, onViewDocument }) {
           </div>
           <div style={{ background: 'var(--bg)', borderRadius: 12, padding: 14, marginBottom: 20 }}>
             {record.dojah_bvn_checked && (
-              <DojahReportRow label="BVN" matched={record.dojah_bvn_matched} name={record.dojah_bvn_name} error={record.dojah_bvn_error} />
+              <DojahReportRow label="BVN" matched={record.dojah_bvn_matched} faceMatch={record.dojah_bvn_face_match} faceConfidence={record.dojah_bvn_face_confidence} name={record.dojah_bvn_name} error={record.dojah_bvn_error} />
             )}
             {record.dojah_nin_checked && (
-              <DojahReportRow label="NIN" matched={record.dojah_nin_matched} name={record.dojah_nin_name} error={record.dojah_nin_error} />
+              <DojahReportRow label="NIN" matched={record.dojah_nin_matched} faceMatch={record.dojah_nin_face_match} faceConfidence={record.dojah_nin_face_confidence} name={record.dojah_nin_name} error={record.dojah_nin_error} />
             )}
             <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 8 }}>
-              Informational only — doesn't affect approval. Review and decide below.
+              A confirmed face match (selfie vs. official photo) auto-approves this KYC. Anything less falls back to manual review below.
             </div>
           </div>
         </>
@@ -540,15 +541,27 @@ function ResubmissionPanel({ record }) {
 // One line of the Dojah verification report - shows whether the
 // provided BVN/NIN matched Dojah's records, the name on file if
 // returned, or the error if the lookup itself failed.
-function DojahReportRow({ label, matched, name, error }) {
-  const color = error ? 'var(--error)' : matched ? 'var(--green-dark)' : 'var(--error)'
-  const icon = error ? '⚠️' : matched ? '✅' : '❌'
+export function DojahReportRow({ label, matched, faceMatch, faceConfidence, name, error }) {
+  const recordColor = error ? 'var(--error)' : matched ? 'var(--green-dark)' : 'var(--error)'
+  const recordIcon = error ? '⚠️' : matched ? '✅' : '❌'
+  const faceColor = faceMatch === true ? 'var(--green-dark)' : faceMatch === false ? 'var(--error)' : 'var(--slate)'
+  const faceIcon = faceMatch === true ? '✅' : faceMatch === false ? '❌' : '—'
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', fontSize: 12.5 }}>
-      <span style={{ fontWeight: 600 }}>{label}</span>
-      <span style={{ color }}>
-        {icon} {error ? error : matched ? `Matched${name ? ` — ${name}` : ''}` : 'No match found'}
-      </span>
+    <div style={{ padding: '6px 0', fontSize: 12.5 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span style={{ fontWeight: 600 }}>{label} record</span>
+        <span style={{ color: recordColor }}>
+          {recordIcon} {error ? error : matched ? `Found${name ? ` — ${name}` : ''}` : 'No record found'}
+        </span>
+      </div>
+      {matched && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 3 }}>
+          <span style={{ fontWeight: 600 }}>Selfie face match</span>
+          <span style={{ color: faceColor }}>
+            {faceIcon} {faceMatch === true ? `Matched${faceConfidence != null ? ` (${faceConfidence}% confidence)` : ''}` : faceMatch === false ? `No match${faceConfidence != null ? ` (${faceConfidence}% confidence)` : ''}` : 'Not checked'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

@@ -105,7 +105,7 @@ export default function ClaimCodes() {
           <Row label="Receiver mobile" value={result.counterparty_mobile || '—'} mono />
           <Row label="Amount" value={formatNaira(Number(result.amount))} mono />
           <Row label="Sent" value={new Date(result.date_time).toLocaleString()} />
-          <Row label="Assigned agent" value={agentProfile ? `${agentProfile.full_name} ${agentProfile.surname}${agentProfile.business_name ? ` — ${agentProfile.business_name}` : ''}` : '—'} />
+          <Row label="Assigned agent" value={agentProfile ? `${agentProfile.full_name} ${agentProfile.surname}${agentProfile.business_name ? ` — ${agentProfile.business_name}` : ''}` : (result?.agent_name_snapshot || (result?.agent_id ? 'Deleted user' : '—'))} />
           <button
             className="no-print"
             onClick={() => window.print()}

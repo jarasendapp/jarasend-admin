@@ -62,12 +62,12 @@ export default function Wallets() {
       setPersonalTx((sendTx ?? []).map((t) => ({
         ...t,
         amount: Number(t.amount),
-        sender: profiles[t.user_id] ? `${profiles[t.user_id].full_name} ${profiles[t.user_id].surname}` : t.user_id,
+        sender: t.sender_name_snapshot || (profiles[t.user_id] ? `${profiles[t.user_id].full_name} ${profiles[t.user_id].surname}` : 'Deleted user'),
       })))
       setAgentTx((payoutTx ?? []).map((t) => ({
         ...t,
         amount: Number(t.amount),
-        agentName: t.agent_id && profiles[t.agent_id] ? `${profiles[t.agent_id].full_name} ${profiles[t.agent_id].surname}` : '—',
+        agentName: t.agent_id ? (t.agent_name_snapshot || (profiles[t.agent_id] ? `${profiles[t.agent_id].full_name} ${profiles[t.agent_id].surname}` : 'Deleted user')) : '—',
       })))
     } catch (err) {
       setLoadError(err.message || 'Could not load wallet data.')
