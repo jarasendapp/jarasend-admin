@@ -30,7 +30,7 @@ export default function Settlement() {
       const { data, error } = await supabase.from('agent_accounts').select('*')
       if (error) throw error
 
-      const userIds = (data ?? []).map((a) => a.user_id)
+      const userIds = (data ?? []).map((a) => a.user_id).filter(Boolean)
       const { data: profileRows, error: profileError } = userIds.length
         ? await supabase.from('profiles').select('id, full_name, surname, business_town').in('id', userIds)
         : { data: [], error: null }

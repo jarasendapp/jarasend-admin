@@ -42,7 +42,7 @@ export default function Transactions() {
       if (error) throw error
       setTransactions((data ?? []).map((t) => ({ ...t, amount: Number(t.amount), fee: Number(t.fee) })))
 
-      const userIds = [...new Set((data ?? []).map((t) => t.user_id))]
+      const userIds = [...new Set((data ?? []).map((t) => t.user_id).filter(Boolean))]
       if (userIds.length) {
         const { data: profileRows, error: profileError } = await supabase
           .from('profiles')

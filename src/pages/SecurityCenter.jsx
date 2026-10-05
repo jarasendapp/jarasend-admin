@@ -32,7 +32,7 @@ export default function SecurityCenter() {
           .limit(500)
         if (logsError) throw logsError
 
-        const userIds = [...new Set((logs ?? []).map((l) => l.user_id))]
+        const userIds = [...new Set((logs ?? []).map((l) => l.user_id).filter(Boolean))]
         const { data: profiles, error: profilesError } = userIds.length
           ? await supabase.from('profiles').select('id, full_name, surname, phone').in('id', userIds)
           : { data: [], error: null }

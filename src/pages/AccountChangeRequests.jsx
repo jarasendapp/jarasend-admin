@@ -29,7 +29,7 @@ export default function AccountChangeRequests() {
       if (error) throw error
       setRequests(data ?? [])
 
-      const userIds = [...new Set((data ?? []).map((r) => r.user_id))]
+      const userIds = [...new Set((data ?? []).map((r) => r.user_id).filter(Boolean))]
       if (userIds.length) {
         const { data: profileRows, error: profileError } = await supabase
           .from('profiles')

@@ -29,7 +29,7 @@ export default function KycManagement() {
         .order('submitted_at', { ascending: false })
       if (kycError) throw kycError
 
-      const userIds = [...new Set((kyc ?? []).map((k) => k.user_id))]
+      const userIds = [...new Set((kyc ?? []).map((k) => k.user_id).filter(Boolean))]
       const { data: profiles, error: profilesError } = userIds.length
         ? await supabase.from('profiles').select('id, full_name, surname, phone, email, date_of_birth, house_number, street_name, town, state, country, business_name, business_house_number, business_street_name, business_town, business_state, business_country').in('id', userIds)
         : { data: [], error: null }

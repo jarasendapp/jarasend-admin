@@ -39,8 +39,8 @@ export default function Wallets() {
         ...(wallets ?? []).map((w) => w.user_id),
         ...(agents ?? []).map((a) => a.user_id),
         ...(sendTx ?? []).map((t) => t.user_id),
-        ...(payoutTx ?? []).map((t) => t.agent_id).filter(Boolean),
-      ])]
+        ...(payoutTx ?? []).map((t) => t.agent_id),
+      ].filter(Boolean))]
       const { data: profileRows, error: profileError } = allUserIds.length
         ? await supabase.from('profiles').select('id, full_name, surname, phone, business_name, business_town').in('id', allUserIds)
         : { data: [], error: null }

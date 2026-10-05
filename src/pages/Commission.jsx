@@ -47,10 +47,13 @@ export default function Commission() {
       if (error) throw error
 
       const totals = {}
+      let total = 0
       for (const r of rows ?? []) {
-        totals[r.related_user_id] = (totals[r.related_user_id] ?? 0) + Number(r.amount)
+        total += Number(r.amount)
+        // A null id (user since deleted) must not become the string key
+        // "null" — that is what Supabase rejects as an invalid uuid.
+        if (r.related_user_id) totals[r.related_user_id] = (totals[r.related_user_id] ?? 0) + Number(r.amount)
       }
-      const total = Object.values(totals).reduce((s, v) => s + v, 0)
       setTotalPaidThisMonth(total)
 
       const userIds = Object.keys(totals)

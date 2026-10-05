@@ -24,7 +24,7 @@ export default function FraudMonitoring() {
           .limit(300)
         if (alertsError) throw alertsError
 
-        const userIds = [...new Set((alerts ?? []).map((a) => a.user_id))]
+        const userIds = [...new Set((alerts ?? []).map((a) => a.user_id).filter(Boolean))]
         const { data: profiles, error: profilesError } = userIds.length
           ? await supabase.from('profiles').select('id, full_name, surname, phone').in('id', userIds)
           : { data: [], error: null }
