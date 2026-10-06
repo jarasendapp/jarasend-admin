@@ -79,6 +79,10 @@ export default function ApiMonitoring() {
         <KudiSmsCard />
       </div>
 
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
+        <MoneyCard />
+      </div>
+
       <div style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 22, maxWidth: 760 }}>
         <h3 style={{ fontSize: 14, marginBottom: 8 }}>What this doesn't cover yet</h3>
         <p style={{ fontSize: 12.5, color: 'var(--slate)', lineHeight: 1.7, marginTop: 0 }}>
@@ -157,9 +161,89 @@ function DojahCard() {
   )
 }
 
+function MoneyCard() {
+  const [info, setInfo] = useState(null) // null = the money tables are not set up yet
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const { data: intents, error: intentsErr } = await supabase
+          .from('money_intents')
+          .select('status')
+          .limit(5000)
+        if (intentsErr) throw intentsErr
+        const { data: runs } = await supabase
+          .from('reconciliation_runs')
+          .select('outcome, ran_at')
+          .order('ran_at', { ascending: false })
+          .limit(1)
+        const { data: flags } = await supabase
+          .from('app_settings')
+          .select('key, value')
+          .in('key', ['sends_paused', 'sends_paused_reason'])
+        const rows = intents ?? []
+        const count = (...statuses) => rows.filter((i) => statuses.includes(i.status)).length
+        const flag = (k) => (flags ?? []).find((f) => f.key === k)?.value
+        setInfo({
+          inProgress: count('pending', 'submitting'),
+          review: count('needs_review'),
+          failed: count('failed'),
+          done: count('succeeded'),
+          run: runs?.[0] ?? null,
+          paused: flag('sends_paused') === 'true',
+          reason: flag('sends_paused_reason') || '',
+        })
+      } catch {
+        setInfo(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  return (
+    <IntegrationCard title="Money movements (Anchor)" loading={loading} error="">
+      {info ? (
+        <>
+          {info.paused && (
+            <div style={{ background: 'var(--error-tint)', border: '1px solid var(--error)', borderRadius: 8, padding: '8px 10px', marginBottom: 10 }}>
+              <p style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--error)', margin: 0 }}>New sends are PAUSED</p>
+              {info.reason && <p style={{ fontSize: 11.5, color: 'var(--error)', margin: '4px 0 0' }}>{info.reason}</p>}
+            </div>
+          )}
+          <p style={{ fontSize: 12.5, marginBottom: 6 }}>
+            <strong className="mono">{info.done}</strong> completed
+            {' · '}
+            <strong className="mono">{info.inProgress}</strong> in progress
+            {' · '}
+            <strong className="mono">{info.failed}</strong> failed
+          </p>
+          {info.review > 0 && (
+            <p style={{ fontSize: 11.5, color: 'var(--error)', margin: '0 0 6px' }}>
+              {info.review} movement{info.review === 1 ? '' : 's'} need a person to look at them
+            </p>
+          )}
+          {info.run ? (
+            <p style={{ fontSize: 11.5, color: info.run.outcome === 'mismatch' ? 'var(--error)' : 'var(--slate)', margin: 0 }}>
+              Holding account check: <strong>{info.run.outcome}</strong> · {new Date(info.run.ran_at).toLocaleString()}
+            </p>
+          ) : (
+            <p style={{ fontSize: 11.5, color: 'var(--slate)', margin: 0 }}>The holding account has not been checked yet.</p>
+          )}
+        </>
+      ) : (
+        <p style={{ fontSize: 11.5, color: 'var(--slate)', margin: 0 }}>Money tracking isn't set up yet (run the money foundation SQL).</p>
+      )}
+    </IntegrationCard>
+  )
+}
+
 function AnchorCard() {
   const [count, setCount] = useState(0)
   const [latest, setLatest] = useState(null)
+  const [deposits, setDeposits] = useState(null) // null = deposit tracking not set up yet
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -183,7 +267,31 @@ function AnchorCard() {
         setLoading(false)
       }
     }
+
+    // Kept separate so a missing table (funding SQL not run yet) never breaks the card.
+    async function loadDeposits() {
+      try {
+        const { data, error: depErr } = await supabase
+          .from('anchor_credits')
+          .select('status, amount_kobo, received_at')
+          .order('received_at', { ascending: false })
+          .limit(500)
+        if (depErr) throw depErr
+        const rows = data ?? []
+        setDeposits({
+          count: rows.length,
+          totalNaira: rows.reduce((sum, r) => sum + Number(r.amount_kobo), 0) / 100,
+          unclaimed: rows.filter((r) => r.status === 'unclaimed').length,
+          unmatched: rows.filter((r) => r.status === 'unmatched').length,
+          latest: rows[0]?.received_at ?? null,
+        })
+      } catch {
+        setDeposits(null)
+      }
+    }
+
     load()
+    loadDeposits()
   }, [])
 
   return (
@@ -202,6 +310,33 @@ function AnchorCard() {
       ) : (
         <p style={{ fontSize: 12, color: 'var(--slate)' }}>No virtual accounts issued yet.</p>
       )}
+
+      <div style={{ borderTop: '1px solid #EAECF0', marginTop: 12, paddingTop: 10 }}>
+        {deposits ? (
+          <>
+            <p style={{ fontSize: 12.5, marginBottom: 6 }}>
+              <strong className="mono">{deposits.count}</strong> deposit{deposits.count === 1 ? '' : 's'} received
+              {' · '}
+              <strong className="mono">₦{deposits.totalNaira.toLocaleString()}</strong>
+            </p>
+            {deposits.unclaimed > 0 && (
+              <p style={{ fontSize: 11.5, color: 'var(--slate)', margin: '0 0 4px' }}>
+                {deposits.unclaimed} waiting for the user's app to collect
+              </p>
+            )}
+            {deposits.unmatched > 0 && (
+              <p style={{ fontSize: 11.5, color: 'var(--error)', margin: '0 0 4px' }}>
+                {deposits.unmatched} matched no user — needs a look
+              </p>
+            )}
+            {deposits.latest && (
+              <p style={{ fontSize: 11.5, color: 'var(--slate)', margin: 0 }}>Last deposit {new Date(deposits.latest).toLocaleString()}</p>
+            )}
+          </>
+        ) : (
+          <p style={{ fontSize: 11.5, color: 'var(--slate)', margin: 0 }}>Deposit tracking isn't set up yet (run the funding SQL).</p>
+        )}
+      </div>
     </IntegrationCard>
   )
 }

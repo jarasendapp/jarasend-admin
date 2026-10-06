@@ -111,6 +111,8 @@ export default function PersonalAccounts() {
         .from('anchor_accounts')
         .select('*')
         .eq('user_id', userId)
+        .order('updated_at', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       setDetail({ profile, wallet, kyc, anchor })
@@ -309,6 +311,9 @@ export default function PersonalAccounts() {
                   <DetailRow label="Virtual account number" value={detail.anchor.virtual_account_number || '—'} mono />
                   <DetailRow label="Virtual account bank" value={detail.anchor.virtual_bank_name || '—'} />
                   <DetailRow label="Verified" value={detail.anchor.verified ? 'Yes' : 'No'} />
+                  <DetailRow label="Environment" value={detail.anchor.environment || 'sandbox'} />
+                  <DetailRow label="Identity check" value={detail.anchor.verification_state || '—'} />
+                  {detail.anchor.last_error && <DetailRow label="Last problem" value={detail.anchor.last_error} />}
                 </>
               ) : (
                 <p style={{ fontSize: 12.5, color: 'var(--slate)' }}>Not set up yet — this account hasn't funded its wallet via Anchor.</p>

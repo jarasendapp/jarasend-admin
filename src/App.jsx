@@ -14,6 +14,7 @@ import Wallets from './pages/Wallets'
 import Settlement from './pages/Settlement'
 import Commission from './pages/Commission'
 import AccountChangeRequests from './pages/AccountChangeRequests'
+import EmailChangeRequests from './pages/EmailChangeRequests'
 import FraudMonitoring from './pages/FraudMonitoring'
 import SecurityCenter from './pages/SecurityCenter'
 import AuditLogs from './pages/AuditLogs'
@@ -42,6 +43,7 @@ export default function App() {
             <Route path="/settlement" element={<Settlement />} />
             <Route path="/commission" element={<Commission />} />
             <Route path="/account-change-requests" element={<AccountChangeRequests />} />
+            <Route path="/email-change-requests" element={<EmailChangeRequests />} />
             <Route path="/fraud-monitoring" element={<FraudMonitoring />} />
             <Route path="/security-center" element={<SecurityCenter />} />
             <Route path="/audit-logs" element={<AuditLogs />} />

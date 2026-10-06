@@ -28,6 +28,7 @@ const NAV_GROUPS = [
       { to: '/settlement', label: 'Settlement' },
       { to: '/commission', label: 'Commission' },
       { to: '/account-change-requests', label: 'Account Change Requests' },
+      { to: '/email-change-requests', label: 'Email Change Requests' },
     ],
   },
   {
