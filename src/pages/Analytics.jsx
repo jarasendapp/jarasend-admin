@@ -104,7 +104,6 @@ export default function Analytics() {
 
   // ---- Expenses ----
   const commissionTotal = useMemo(() => revenueRows.filter((r) => r.type === 'agent_commission').reduce((s, r) => s + r.amount, 0), [revenueRows])
-  const floatOutstanding = useMemo(() => agentAccounts.reduce((s, a) => s + a.float, 0), [agentAccounts])
 
   // ---- Transactions ----
   const txByType = useMemo(() => {
@@ -123,7 +122,6 @@ export default function Analytics() {
 
   // ---- Agents ----
   const activeAgentCount = agentAccounts.filter((a) => a.received > 0).length
-  const avgFloat = agentAccounts.length ? floatOutstanding / agentAccounts.length : 0
 
   const PIE_COLORS = ['#0B1F3A', '#2E8B57', '#854F0B', '#B91C1C', '#6366F1']
 
@@ -232,9 +230,8 @@ export default function Analytics() {
 
       {tab === 'Expenses' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
             <StatCard label="Agent commission paid" value={formatNaira(commissionTotal)} />
-            <StatCard label="Float outstanding to agents" value={formatNaira(floatOutstanding)} />
             <StatCard label="Net revenue" value={formatNaira(revenueTotals.transaction_fee + revenueTotals.onboarding_fee - commissionTotal)} />
           </div>
           <ChartPanel title="Note">
@@ -280,11 +277,9 @@ export default function Analytics() {
 
       {tab === 'Agents' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
             <StatCard label="Total agents" value={agentAccounts.length} />
             <StatCard label="Active agents" value={activeAgentCount} />
-            <StatCard label="Average float" value={formatNaira(avgFloat)} />
-            <StatCard label="Total float outstanding" value={formatNaira(floatOutstanding)} />
           </div>
           <ChartPanel title="Note">
             <p style={{ fontSize: 12.5, color: 'var(--slate)', lineHeight: 1.6, margin: 0 }}>

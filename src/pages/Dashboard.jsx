@@ -61,8 +61,8 @@ export default function Dashboard() {
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'agent').eq('status', 'rejected'),
           supabase.from('profiles').select('created_at').order('created_at', { ascending: true }),
           supabase.from('company_revenue').select('type, amount'),
-          supabase.from('wallets').select('available'),
-          supabase.from('agent_accounts').select('float'),
+          supabase.rpc('admin_personal_wallets'),
+          supabase.rpc('admin_agent_wallets'),
           supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'send').eq('status', 'pendingCollection'),
           supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'send').eq('status', 'collected'),
           supabase.from('transactions').select('date_time').eq('type', 'send').order('date_time', { ascending: false }).limit(1000),
@@ -87,8 +87,17 @@ export default function Dashboard() {
         const realOnboardingFees = (revenueRows ?? []).filter((r) => r.type === 'onboarding_fee').reduce((sum, r) => sum + Number(r.amount), 0)
         const realAgentCommission = (revenueRows ?? []).filter((r) => r.type === 'agent_commission').reduce((sum, r) => sum + Number(r.amount), 0)
 
-        const realWalletTotal = (personalWallets ?? []).reduce((sum, w) => sum + Number(w.available), 0)
-          + (agentWallets ?? []).reduce((sum, a) => sum + Number(a.float), 0)
+        // Wallet money lives at Anchor, so the total is the live Anchor balance of every wallet (read by the admin-api function).
+        let realWalletTotal = 0
+        try {
+          const accountIds = [...(personalWallets ?? []), ...(agentWallets ?? [])].map((w) => w.anchor_account_id).filter(Boolean)
+          if (accountIds.length > 0) {
+            const { data: bal } = await supabase.functions.invoke('admin-api', { body: { action: 'balances', account_ids: accountIds } })
+            if (bal?.ok) realWalletTotal = Object.values(bal.balances ?? {}).reduce((sum, v) => sum + (Number(v) || 0), 0) / 100
+          }
+        } catch {
+          realWalletTotal = 0
+        }
 
         // Bucket the last 7 days of send transactions by day for the chart.
         const dayCounts = {}

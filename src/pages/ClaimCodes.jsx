@@ -2,85 +2,84 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import StatusBadge from '../components/StatusBadge'
 
-function formatNaira(n) {
-  return '₦' + n.toLocaleString('en-NG')
+function formatNaira(kobo) {
+  return '₦' + (Number(kobo) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function fmtDateTime(v) {
+  return v ? new Date(v).toLocaleString() : '—'
 }
 
 const STATUS_MAP = {
-  pendingCollection: 'Pending', collected: 'Completed', expired: 'Expired',
-  cancelled: 'Reversed', failed: 'Reversed', reversed: 'Reversed',
+  held: 'Pending', released: 'Completed', refunded: 'Reversed',
+  pending_hold: 'Processing', releasing: 'Processing', refunding: 'Processing',
+  failed: 'Failed',
 }
 
-// Hashes the entered code with SHA-256, matching the mobile app's own
-// hashing exactly (sha256.convert(utf8.encode(value)).toString()) — the
-// plaintext code is never stored anywhere, including here. This only
-// lets us confirm whether a code someone reads out over the phone
-// matches a real transaction, the same way a system verifies a PIN
-// without ever displaying it.
-async function sha256Hex(value) {
-  const bytes = new TextEncoder().encode(value)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', bytes)
-  return Array.from(new Uint8Array(hashBuffer)).map((b) => b.toString(16).padStart(2, '0')).join('')
-}
+const inputStyle = { padding: '11px 14px', borderRadius: 10, border: '1px solid var(--divider)', fontSize: 14, fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
+const labelStyle = { display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--slate)', marginBottom: 5 }
 
 export default function ClaimCodes() {
-  const [query, setQuery] = useState('')
-  const [result, setResult] = useState(null)
+  const [code, setCode] = useState('')
+  const [phone, setPhone] = useState('')
+  const [results, setResults] = useState([])
+  const [codeChecked, setCodeChecked] = useState(false)
   const [searched, setSearched] = useState(false)
   const [searching, setSearching] = useState(false)
-  const [profiles, setProfiles] = useState({})
+  const [message, setMessage] = useState('')
 
   async function handleSearch(e) {
     e.preventDefault()
-    const code = query.trim()
-    if (!code) return
+    const c = code.trim()
+    const p = phone.trim()
+    setMessage('')
+    if (!c && !p) {
+      setSearched(false)
+      setResults([])
+      setMessage('Enter a claim code, a receiver phone number, or both.')
+      return
+    }
     setSearching(true)
     setSearched(false)
+    setResults([])
     try {
-      const hash = await sha256Hex(code)
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .eq('pickup_code_hash', hash)
-        .maybeSingle()
-      if (error) throw error
-      setResult(data)
-
-      if (data) {
-        const userIds = [data.user_id, data.agent_id].filter(Boolean)
-        const { data: profileRows } = await supabase
-          .from('profiles')
-          .select('id, full_name, surname, business_name')
-          .in('id', userIds)
-        setProfiles(Object.fromEntries((profileRows ?? []).map((p) => [p.id, p])))
+      const body = { action: 'claim_lookup' }
+      if (c) body.code = c
+      if (p) body.phone = p
+      const { data, error } = await supabase.functions.invoke('admin-api', { body })
+      if (error) throw new Error(error.message || 'Lookup failed. Please try again.')
+      if (!data?.ok) {
+        setMessage(data?.error || 'Lookup failed. Please try again.')
+        return
       }
+      setResults((data.results ?? []).slice(0, 20))
+      setCodeChecked(!!data.code_checked)
+      setSearched(true)
     } catch (err) {
-      setResult(null)
+      setMessage(err.message || 'Lookup failed. Please try again.')
     } finally {
       setSearching(false)
-      setSearched(true)
     }
   }
-
-  const agentProfile = result?.agent_id ? profiles[result.agent_id] : null
 
   return (
     <div style={{ padding: 28 }}>
       <div>
         <h1 style={{ fontSize: 22, marginBottom: 4 }}>Claim codes</h1>
         <p style={{ color: 'var(--slate)', fontSize: 13, marginTop: 0 }}>
-          Look up a single redemption code — useful when a customer or agent calls in about one. The code itself is never stored or shown here — only whether it matches.
+          Look up cash-pickup records by claim code, by receiver phone number, or both — useful when a customer or agent calls in. The code itself is never shown here — only whether it matches.
         </p>
       </div>
 
-      <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10, margin: '20px 0', maxWidth: 420 }}>
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Enter 6-digit code…"
-          style={{ flex: 1, padding: '11px 14px', borderRadius: 10, border: '1px solid var(--divider)', fontSize: 14, fontFamily: 'inherit' }}
-        />
+      <form onSubmit={handleSearch} style={{ display: 'flex', gap: 10, margin: '20px 0', maxWidth: 640, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <label style={labelStyle}>Claim code (6 digits)</label>
+          <input type="text" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value)} placeholder="123456" style={inputStyle} />
+        </div>
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <label style={labelStyle}>Receiver phone number</label>
+          <input type="text" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="0706…" style={inputStyle} />
+        </div>
         <button
           type="submit"
           disabled={searching}
@@ -90,32 +89,54 @@ export default function ClaimCodes() {
         </button>
       </form>
 
-      {searched && !result && (
-        <div style={{ background: 'var(--error-tint)', color: 'var(--error)', borderRadius: 10, padding: '12px 14px', fontSize: 13, maxWidth: 420 }}>
-          No record found for that code.
+      {searching && <div style={{ color: 'var(--slate)', fontSize: 13 }}>Looking up…</div>}
+
+      {message && (
+        <div style={{ background: 'var(--error-tint)', color: 'var(--error)', borderRadius: 10, padding: '12px 14px', fontSize: 13, maxWidth: 640 }}>
+          {message}
         </div>
       )}
 
-      {result && (
-        <div style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 22, maxWidth: 420 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)' }}>✓ Code matches this transaction</span>
-            <StatusBadge status={STATUS_MAP[result.status] ?? result.status} />
-          </div>
-          <Row label="Receiver mobile" value={result.counterparty_mobile || '—'} mono />
-          <Row label="Amount" value={formatNaira(Number(result.amount))} mono />
-          <Row label="Sent" value={new Date(result.date_time).toLocaleString()} />
-          <Row label="Assigned agent" value={agentProfile ? `${agentProfile.full_name} ${agentProfile.surname}${agentProfile.business_name ? ` — ${agentProfile.business_name}` : ''}` : (result?.agent_name_snapshot || (result?.agent_id ? 'Deleted user' : '—'))} />
-          <button
-            className="no-print"
-            onClick={() => window.print()}
-            style={{
-              marginTop: 16, width: '100%', padding: '9px', borderRadius: 10, border: '1px solid var(--divider)',
-              background: '#fff', fontSize: 12.5, fontWeight: 600, color: 'var(--navy)',
-            }}
-          >
-            🖨 Print this record
-          </button>
+      {searched && results.length === 0 && (
+        <div style={{ background: 'var(--error-tint)', color: 'var(--error)', borderRadius: 10, padding: '12px 14px', fontSize: 13, maxWidth: 640 }}>
+          No record found.
+        </div>
+      )}
+
+      {results.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 520 }}>
+          {results.map((r) => (
+            <div key={r.reference} style={{ background: '#fff', border: '1px solid var(--divider)', borderRadius: 14, padding: 22 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                {codeChecked ? (
+                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--green-dark)' }}>✓ Code matches</span>
+                ) : (
+                  <span style={{ fontSize: 12, color: 'var(--slate)' }}>Code not checked (phone search)</span>
+                )}
+                <StatusBadge status={STATUS_MAP[r.status] ?? r.status} />
+              </div>
+              <Row label="Reference" value={r.reference} mono />
+              <Row label="Receiver mobile" value={r.receiver_phone || '—'} mono />
+              <Row label="Amount" value={formatNaira(r.amount_kobo)} mono />
+              <Row label="Fee" value={formatNaira(r.fee_kobo)} mono />
+              <Row label="Sender" value={r.sender_name || '—'} />
+              <Row label="Sender phone" value={r.sender_phone || '—'} mono />
+              <Row label="Sent" value={fmtDateTime(r.created_at)} />
+              <Row label="Expires" value={fmtDateTime(r.expires_at)} />
+              <Row label="Claimed" value={fmtDateTime(r.claimed_at)} />
+              <Row label="Assigned agent" value={r.agent_name || '—'} />
+              <button
+                className="no-print"
+                onClick={() => window.print()}
+                style={{
+                  marginTop: 16, width: '100%', padding: '9px', borderRadius: 10, border: '1px solid var(--divider)',
+                  background: '#fff', fontSize: 12.5, fontWeight: 600, color: 'var(--navy)',
+                }}
+              >
+                🖨 Print this record
+              </button>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -126,7 +147,7 @@ function Row({ label, value, mono }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '9px 0', borderBottom: '1px solid var(--divider)' }}>
       <span style={{ fontSize: 12.5, color: 'var(--slate)' }}>{label}</span>
-      <span className={mono ? 'mono' : undefined} style={{ fontSize: 13, fontWeight: 600 }}>{value}</span>
+      <span className={mono ? 'mono' : undefined} style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>{value}</span>
     </div>
   )
 }

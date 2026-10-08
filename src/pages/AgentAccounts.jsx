@@ -119,7 +119,22 @@ export default function AgentAccounts() {
         .limit(1)
         .maybeSingle()
 
-      setDetail({ profile, agentAccount, kyc, anchor })
+      // Real wallet figures: the agent's live Anchor balance plus what the money rules recorded.
+      let wallet = null
+      let balanceKobo = null
+      try {
+        const { data: wallets } = await supabase.rpc('admin_agent_wallets')
+        wallet = (wallets ?? []).find((w) => w.user_id === userId) ?? null
+        if (wallet?.anchor_account_id) {
+          const { data: bal } = await supabase.functions.invoke('admin-api', { body: { action: 'balances', account_ids: [wallet.anchor_account_id] } })
+          const v = bal?.ok ? bal.balances?.[wallet.anchor_account_id] : null
+          balanceKobo = v === null || v === undefined ? null : Number(v)
+        }
+      } catch {
+        wallet = null
+      }
+
+      setDetail({ profile, agentAccount, kyc, anchor, wallet, balanceKobo })
     } catch (err) {
       setDetailError(err.message || 'Could not load this agent\'s details.')
     } finally {
@@ -329,10 +344,11 @@ export default function AgentAccounts() {
               <DetailRow label="Account name" value={detail.kyc?.bank_account_name || '—'} />
 
               <DetailSectionLabel>Wallet</DetailSectionLabel>
-              <DetailRow label="Float" value={detail.agentAccount ? formatNaira(detail.agentAccount.float) : '—'} mono />
-              <DetailRow label="Commission balance" value={detail.agentAccount ? formatNaira(detail.agentAccount.commission) : '—'} mono />
-              <DetailRow label="Total cash received" value={detail.agentAccount ? formatNaira(detail.agentAccount.total_cash_received) : '—'} mono />
-              <DetailRow label="Total cash withdrawn" value={detail.agentAccount ? formatNaira(detail.agentAccount.total_cash_withdrawn) : '—'} mono />
+              <DetailRow label="Wallet balance" value={detail.balanceKobo === null || detail.balanceKobo === undefined ? '—' : formatKobo(detail.balanceKobo)} mono />
+              <DetailRow label="Commission balance" value={detail.wallet ? `${Number(detail.wallet.commission_balance_points) || 0} points` : '—'} mono />
+              <DetailRow label="Commission earned total" value={detail.wallet ? `${Number(detail.wallet.commission_total_points) || 0} points` : '—'} mono />
+              <DetailRow label="Total cash received" value={detail.wallet ? formatKobo(detail.wallet.cash_received_kobo) : '—'} mono />
+              <DetailRow label="Total cash withdrawn" value={detail.wallet ? formatKobo(detail.wallet.withdrawn_kobo) : '—'} mono />
 
               <DetailSectionLabel>Anchor (real banking)</DetailSectionLabel>
               {detail.anchor ? (
@@ -364,6 +380,9 @@ function formatAddress(profile, houseKey, streetKey, townKey, stateKey, countryK
   return parts.length ? parts.join(', ') : '—'
 }
 
+function formatKobo(k) {
+  return '₦' + (Number(k) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
 function formatNaira(n) {
   return '₦' + Number(n).toLocaleString('en-NG')
 }
