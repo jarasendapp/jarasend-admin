@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { fetchRevenue } from '../lib/revenue'
 import KpiCard from '../components/KpiCard'
 
 // Wallet balances, transaction counts, and revenue are now genuinely
 // live, pulled from Supabase. GetAnchor and SMS costs remain sample —
 // genuinely dependent on those third-party integrations, which aren't
 // built yet.
-const SAMPLE_ANCHOR_FEES = 18200          // GetAnchor's per-transaction processing fee
-const SAMPLE_SMS_FEES = 4800              // SMS provider charges for redemption codes
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
@@ -60,7 +59,7 @@ export default function Dashboard() {
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'personal').eq('status', 'rejected'),
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'agent').eq('status', 'rejected'),
           supabase.from('profiles').select('created_at').order('created_at', { ascending: true }),
-          supabase.from('company_revenue').select('type, amount'),
+          fetchRevenue(),
           supabase.rpc('admin_personal_wallets'),
           supabase.rpc('admin_agent_wallets'),
           supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'send').eq('status', 'pendingCollection'),
@@ -164,7 +163,7 @@ export default function Dashboard() {
         <KpiCard label="Rejected agents" value={loading ? '—' : stats.rejectedAgents} icon="✕" tint="gold" />
       </div>
 
-      <SectionLabel>Money & transactions — fees & commission now live, rest still sample</SectionLabel>
+      <SectionLabel>Money & transactions — live</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16, marginBottom: 14 }}>
         <RevenueBreakdown realGrossFees={stats.realGrossFees} realOnboardingFees={stats.realOnboardingFees} realAgentCommission={stats.realAgentCommission} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -175,10 +174,10 @@ export default function Dashboard() {
             label="Net margin"
             value={
               stats.realGrossFees + stats.realOnboardingFees > 0
-                ? (((stats.realGrossFees + stats.realOnboardingFees - stats.realAgentCommission - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES) / (stats.realGrossFees + stats.realOnboardingFees)) * 100).toFixed(1) + '%'
+                ? (((stats.realGrossFees + stats.realOnboardingFees - stats.realAgentCommission) / (stats.realGrossFees + stats.realOnboardingFees)) * 100).toFixed(1) + '%'
                 : '—'
             }
-            icon="📊" tint="green" sample
+            icon="📊" tint="green"
           />
         </div>
       </div>
@@ -222,14 +221,12 @@ function SectionLabel({ children }) {
 
 function RevenueBreakdown({ realGrossFees, realOnboardingFees, realAgentCommission }) {
   const totalRealRevenue = realGrossFees + realOnboardingFees
-  const netRevenue = totalRealRevenue - realAgentCommission - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES
+  const netRevenue = totalRealRevenue - realAgentCommission
 
   const rows = [
     { label: 'Transaction fees (1.020% per send)', value: realGrossFees, kind: 'total', live: true },
     { label: 'Agent onboarding fees', value: realOnboardingFees, kind: 'total', live: true },
     { label: 'Agent commission paid', value: -realAgentCommission, kind: 'expense', live: true },
-    { label: 'Anchor (GetAnchor) processing fees', value: -SAMPLE_ANCHOR_FEES, kind: 'expense', live: false },
-    { label: 'SMS charges fees', value: -SAMPLE_SMS_FEES, kind: 'expense', live: false },
   ]
 
   return (
@@ -237,7 +234,7 @@ function RevenueBreakdown({ realGrossFees, realOnboardingFees, realAgentCommissi
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h3 style={{ fontSize: 14 }}>Revenue breakdown</h3>
         <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--slate)' }}>
-          Fees genuinely tracked live — commission/Anchor/SMS still sample
+          All live. Anchor and SMS costs are not included.
         </span>
       </div>
 

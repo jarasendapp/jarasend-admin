@@ -1,3 +1,4 @@
+import { callAdminApi } from '../lib/adminApi'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import StatusBadge from '../components/StatusBadge'
@@ -46,8 +47,7 @@ export default function ClaimCodes() {
       const body = { action: 'claim_lookup' }
       if (c) body.code = c
       if (p) body.phone = p
-      const { data, error } = await supabase.functions.invoke('admin-api', { body })
-      if (error) throw new Error(error.message || 'Lookup failed. Please try again.')
+      const data = await callAdminApi(body)
       if (!data?.ok) {
         setMessage(data?.error || 'Lookup failed. Please try again.')
         return
@@ -56,7 +56,7 @@ export default function ClaimCodes() {
       setCodeChecked(!!data.code_checked)
       setSearched(true)
     } catch (err) {
-      setMessage(err.message || 'Lookup failed. Please try again.')
+      setMessage('Lookup failed: ' + (err.message || 'no reason given'))
     } finally {
       setSearching(false)
     }

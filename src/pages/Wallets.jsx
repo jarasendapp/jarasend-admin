@@ -1,3 +1,4 @@
+import { callAdminApi } from '../lib/adminApi'
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import TableToolbar from '../components/TableToolbar'
@@ -53,12 +54,11 @@ export default function Wallets() {
     setBalLoading(true)
     setBalError('')
     try {
-      const { data, error } = await supabase.functions.invoke('admin-api', { body: { action: 'balances', account_ids: accountIds } })
-      if (error) throw new Error(error.message)
-      if (!data?.ok) throw new Error(data?.error || 'Could not read live balances.')
+      const data = await callAdminApi({ action: 'balances', account_ids: accountIds })
+      if (!data?.ok) throw new Error(data?.error || `Unexpected answer from admin-api: ${JSON.stringify(data)?.slice(0, 120)}`)
       setBalances(data.balances ?? {})
     } catch (err) {
-      setBalError(err.message || 'Could not read live balances.')
+      setBalError('Live balances: ' + (err?.message || String(err) || 'no reason given') + ' [admin build 2]')
     } finally {
       setBalLoading(false)
     }

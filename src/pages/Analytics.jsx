@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { fetchRevenue } from '../lib/revenue'
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
@@ -33,9 +34,9 @@ export default function Analytics() {
         ] = await Promise.all([
           supabase.from('profiles').select('id, roles, state, business_state, created_at'),
           supabase.from('kyc_records').select('status, role'),
-          supabase.from('company_revenue').select('type, amount, created_at'),
+          fetchRevenue(),
           supabase.from('transactions').select('type, status, amount, fee, date_time'),
-          supabase.from('agent_accounts').select('user_id, float, commission, total_cash_received, total_cash_withdrawn'),
+          supabase.rpc('admin_agent_wallets'),
         ])
         if (pErr) throw pErr
         if (kErr) throw kErr
@@ -47,7 +48,7 @@ export default function Analytics() {
         setKycRecords(k ?? [])
         setRevenueRows((rev ?? []).map((r) => ({ ...r, amount: Number(r.amount) })))
         setTransactions((tx ?? []).map((t) => ({ ...t, amount: Number(t.amount), fee: Number(t.fee) })))
-        setAgentAccounts((agents ?? []).map((a) => ({ ...a, float: Number(a.float), commission: Number(a.commission), received: Number(a.total_cash_received), withdrawn: Number(a.total_cash_withdrawn) })))
+        setAgentAccounts((agents ?? []).map((a) => ({ user_id: a.user_id, commission: Number(a.commission_total_points) || 0, received: (Number(a.cash_received_kobo) || 0) / 100, withdrawn: (Number(a.withdrawn_kobo) || 0) / 100 })))
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not load analytics.')
       } finally {
