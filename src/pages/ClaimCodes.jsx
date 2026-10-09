@@ -49,7 +49,7 @@ export default function ClaimCodes() {
       if (p) body.phone = p
       const data = await callAdminApi(body)
       if (!data?.ok) {
-        setMessage(data?.error || 'Lookup failed. Please try again.')
+        setMessage(data?.error || ('Lookup failed: unexpected answer from admin-api: ' + JSON.stringify(data)?.slice(0, 120) + ' (is the real admin-api code deployed?)'))
         return
       }
       setResults((data.results ?? []).slice(0, 20))
