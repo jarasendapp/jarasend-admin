@@ -92,23 +92,12 @@ export default function PersonalAccounts() {
         .single()
       if (profileError) throw profileError
 
-      // Real wallet figures: reserved/reversed from the money records, available from the live Anchor balance.
-      let wallet = null
-      try {
-        const { data: wallets } = await supabase.rpc('admin_personal_wallets')
-        const w = (wallets ?? []).find((x) => x.user_id === userId)
-        if (w) {
-          let availableKobo = null
-          if (w.anchor_account_id) {
-            const { data: bal } = await supabase.functions.invoke('admin-api', { body: { action: 'balances', account_ids: [w.anchor_account_id] } })
-            const v = bal?.ok ? bal.balances?.[w.anchor_account_id] : null
-            availableKobo = v === null || v === undefined ? null : Number(v)
-          }
-          wallet = { availableKobo, reservedKobo: Number(w.reserved_kobo) || 0, reversedKobo: Number(w.reversed_kobo) || 0 }
-        }
-      } catch {
-        wallet = null
-      }
+      const { data: wallet, error: walletError } = await supabase
+        .from('wallets')
+        .select('*')
+        .eq('user_id', userId)
+        .maybeSingle()
+      if (walletError) throw walletError
 
       const { data: kyc, error: kycError } = await supabase
         .from('kyc_records')
@@ -312,9 +301,9 @@ export default function PersonalAccounts() {
               )}
 
               <DetailSectionLabel>Wallet</DetailSectionLabel>
-              <DetailRow label="Available" value={detail.wallet ? formatKobo(detail.wallet.availableKobo) : '—'} mono />
-              <DetailRow label="Reserved" value={detail.wallet ? formatKobo(detail.wallet.reservedKobo) : '—'} mono />
-              <DetailRow label="Reversed total" value={detail.wallet ? formatKobo(detail.wallet.reversedKobo) : '—'} mono />
+              <DetailRow label="Available" value={detail.wallet ? formatNaira(detail.wallet.available) : '—'} mono />
+              <DetailRow label="Reserved" value={detail.wallet ? formatNaira(detail.wallet.reserved) : '—'} mono />
+              <DetailRow label="Reversed total" value={detail.wallet ? formatNaira(detail.wallet.reversed_total) : '—'} mono />
 
               <DetailSectionLabel>Anchor (real banking)</DetailSectionLabel>
               {detail.anchor ? (
@@ -346,10 +335,6 @@ function formatAddress(profile) {
   return parts.length ? parts.join(', ') : '—'
 }
 
-function formatKobo(k) {
-  if (k === null || k === undefined) return '—'
-  return '₦' + (Number(k) / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
 function formatNaira(n) {
   return '₦' + Number(n).toLocaleString('en-NG')
 }

@@ -20,11 +20,23 @@ export function AdminAuthProvider({ children }) {
       setStatus('signedOut')
       return
     }
-    const { data, error } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('id', currentSession.user.id)
-      .maybeSingle()
+    setCheckError('')
+    // "JWT issued at future" means the database's clock is a second or two behind
+    // the sign-in server's clock. It clears by itself, so wait and retry a few times.
+    let data = null
+    let error = null
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const res = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('id', currentSession.user.id)
+        .maybeSingle()
+      data = res.data
+      error = res.error
+      const clockSkew = error && /issued at future|iat|not yet valid/i.test(error.message || '')
+      if (!clockSkew) break
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
+    }
 
     if (error) {
       // A genuine query failure (e.g. a database-side issue) is NOT the
@@ -67,12 +79,19 @@ export function AdminAuthProvider({ children }) {
     // admin_users check automatically.
   }
 
+  // Lets the login page re-run the admin check without signing in again.
+  async function recheck() {
+    setStatus('checking')
+    const { data: { session } } = await supabase.auth.getSession()
+    await checkAdminStatus(session)
+  }
+
   async function logout() {
     await supabase.auth.signOut()
   }
 
   return (
-    <AdminAuthContext.Provider value={{ session, adminProfile, status, checkError, login, logout }}>
+    <AdminAuthContext.Provider value={{ session, adminProfile, status, checkError, login, logout, recheck }}>
       {children}
     </AdminAuthContext.Provider>
   )

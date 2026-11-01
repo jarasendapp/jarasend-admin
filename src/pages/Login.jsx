@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom'
 import { useAdminAuth } from '../context/AdminAuthContext'
 
 export default function Login() {
-  const { login, status, checkError } = useAdminAuth()
+  const { login, status, checkError, recheck } = useAdminAuth()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -47,6 +47,11 @@ export default function Login() {
         {status === 'checkFailed' && (
           <div style={{ background: 'var(--error-tint)', color: 'var(--error)', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, marginBottom: 16 }}>
             Couldn't verify your admin status — {checkError || 'please try signing in again.'}
+            <div style={{ marginTop: 8 }}>
+              <button type="button" onClick={recheck} style={{ background: 'var(--error)', color: '#fff', border: 0, borderRadius: 8, padding: '6px 12px', fontSize: 12.5, cursor: 'pointer' }}>
+                Try again
+              </button>
+            </div>
           </div>
         )}
         {error && (
