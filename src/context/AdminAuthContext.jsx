@@ -25,7 +25,8 @@ export function AdminAuthProvider({ children }) {
     // the sign-in server's clock. It clears by itself, so wait and retry a few times.
     let data = null
     let error = null
-    for (let attempt = 0; attempt < 4; attempt++) {
+    let refreshed = false
+    for (let attempt = 0; attempt < 5; attempt++) {
       const res = await supabase
         .from('admin_users')
         .select('*')
@@ -33,8 +34,18 @@ export function AdminAuthProvider({ children }) {
         .maybeSingle()
       data = res.data
       error = res.error
-      const clockSkew = error && /issued at future|iat|not yet valid/i.test(error.message || '')
-      if (!clockSkew) break
+      if (!error) break
+      console.error('admin_users check failed', error)
+      const text = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`
+      const clockSkew = /issued at future|not yet valid/i.test(text)
+      const tokenProblem = /jwt|token/i.test(text) || error.code === 'PGRST301'
+      if (!clockSkew && !tokenProblem && attempt >= 1) break
+      // a bad token: get a fresh one once, then keep retrying
+      if (tokenProblem && !refreshed) {
+        refreshed = true
+        const { data: r } = await supabase.auth.refreshSession()
+        if (r?.session) currentSession = r.session
+      }
       await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)))
     }
 
@@ -45,7 +56,7 @@ export function AdminAuthProvider({ children }) {
       // well be a genuine admin hitting a transient problem that's worth
       // letting them retry rather than losing their session over.
       setStatus('checkFailed')
-      setCheckError(error.message)
+      setCheckError([error.code, error.message, error.details, error.hint].filter(Boolean).join(' | ') || `Unknown error${error.status ? ' (HTTP ' + error.status + ')' : ''}. Press F12 and read the Console for details.`)
       return
     }
     if (!data) {
