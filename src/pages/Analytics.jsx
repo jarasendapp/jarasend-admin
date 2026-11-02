@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { fetchRevenue } from '../lib/revenue'
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
@@ -33,9 +34,9 @@ export default function Analytics() {
         ] = await Promise.all([
           supabase.from('profiles').select('id, roles, state, business_state, created_at'),
           supabase.from('kyc_records').select('status, role'),
-          supabase.from('company_revenue').select('type, amount, created_at'),
+          fetchRevenue(),
           supabase.from('transactions').select('type, status, amount, fee, date_time'),
-          supabase.from('agent_accounts').select('user_id, float, commission, total_cash_received, total_cash_withdrawn'),
+          supabase.rpc('admin_agent_wallets'),
         ])
         if (pErr) throw pErr
         if (kErr) throw kErr
@@ -47,7 +48,7 @@ export default function Analytics() {
         setKycRecords(k ?? [])
         setRevenueRows((rev ?? []).map((r) => ({ ...r, amount: Number(r.amount) })))
         setTransactions((tx ?? []).map((t) => ({ ...t, amount: Number(t.amount), fee: Number(t.fee) })))
-        setAgentAccounts((agents ?? []).map((a) => ({ ...a, float: Number(a.float), commission: Number(a.commission), received: Number(a.total_cash_received), withdrawn: Number(a.total_cash_withdrawn) })))
+        setAgentAccounts((agents ?? []).map((a) => ({ user_id: a.user_id, commission: Number(a.commission_total_points) || 0, received: (Number(a.cash_received_kobo) || 0) / 100, withdrawn: (Number(a.withdrawn_kobo) || 0) / 100 })))
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not load analytics.')
       } finally {
@@ -104,7 +105,6 @@ export default function Analytics() {
 
   // ---- Expenses ----
   const commissionTotal = useMemo(() => revenueRows.filter((r) => r.type === 'agent_commission').reduce((s, r) => s + r.amount, 0), [revenueRows])
-  const floatOutstanding = useMemo(() => agentAccounts.reduce((s, a) => s + a.float, 0), [agentAccounts])
 
   // ---- Transactions ----
   const txByType = useMemo(() => {
@@ -123,7 +123,6 @@ export default function Analytics() {
 
   // ---- Agents ----
   const activeAgentCount = agentAccounts.filter((a) => a.received > 0).length
-  const avgFloat = agentAccounts.length ? floatOutstanding / agentAccounts.length : 0
 
   const PIE_COLORS = ['#0B1F3A', '#2E8B57', '#854F0B', '#B91C1C', '#6366F1']
 
@@ -213,7 +212,7 @@ export default function Analytics() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
             <StatCard label="Transaction fees" value={formatNaira(revenueTotals.transaction_fee)} />
-            <StatCard label="Agent fees (₦3,000 once-off)" value={formatNaira(revenueTotals.onboarding_fee)} />
+            <StatCard label="Onboarding fees" value={formatNaira(revenueTotals.onboarding_fee)} />
             <StatCard label="Total revenue" value={formatNaira(revenueTotals.transaction_fee + revenueTotals.onboarding_fee)} />
           </div>
           <ChartPanel title="Revenue over time">
@@ -232,9 +231,8 @@ export default function Analytics() {
 
       {tab === 'Expenses' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
             <StatCard label="Agent commission paid" value={formatNaira(commissionTotal)} />
-            <StatCard label="Float outstanding to agents" value={formatNaira(floatOutstanding)} />
             <StatCard label="Net revenue" value={formatNaira(revenueTotals.transaction_fee + revenueTotals.onboarding_fee - commissionTotal)} />
           </div>
           <ChartPanel title="Note">
@@ -280,11 +278,9 @@ export default function Analytics() {
 
       {tab === 'Agents' && (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 24 }}>
             <StatCard label="Total agents" value={agentAccounts.length} />
             <StatCard label="Active agents" value={activeAgentCount} />
-            <StatCard label="Average float" value={formatNaira(avgFloat)} />
-            <StatCard label="Total float outstanding" value={formatNaira(floatOutstanding)} />
           </div>
           <ChartPanel title="Note">
             <p style={{ fontSize: 12.5, color: 'var(--slate)', lineHeight: 1.6, margin: 0 }}>

@@ -1,4 +1,4 @@
-export default function DetailModal({ title, onClose, loading, error, children }) {
+export default function DetailModal({ title, onClose, loading, error, children, width = 520 }) {
   return (
     <div
       onClick={onClose}
@@ -9,7 +9,7 @@ export default function DetailModal({ title, onClose, loading, error, children }
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ background: '#fff', borderRadius: 16, padding: 28, width: 520, maxHeight: '85vh', overflowY: 'auto' }}
+        style={{ background: '#fff', borderRadius: 16, padding: 28, width, maxWidth: "100%", maxHeight: '85vh', overflowY: 'auto' }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
           <h2 style={{ fontSize: 17 }}>{title}</h2>

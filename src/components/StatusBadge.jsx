@@ -5,6 +5,8 @@ const STATUS_STYLES = {
   Unclaimed: { bg: '#E8ECF3', fg: 'var(--navy)' },
   Expired: { bg: '#F0F0F0', fg: 'var(--slate)' },
   Reversed: { bg: 'var(--error-tint)', fg: 'var(--error)' },
+  Processing: { bg: '#E8ECF3', fg: 'var(--navy)' },
+  Failed: { bg: 'var(--error-tint)', fg: 'var(--error)' },
   // KYC statuses — kept visually distinct from the cash-pickup set above
   // rather than reusing those labels, since "Reversed" or "Unclaimed"
   // would read as transaction problems, not verification outcomes.

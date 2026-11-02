@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { fetchRevenue } from '../lib/revenue'
 import TableToolbar from '../components/TableToolbar'
 
 // This is the ACTUAL formula from the mobile app's transaction repository
@@ -39,12 +40,9 @@ export default function Commission() {
       monthStart.setDate(1)
       monthStart.setHours(0, 0, 0, 0)
 
-      const { data: rows, error } = await supabase
-        .from('company_revenue')
-        .select('related_user_id, amount')
-        .eq('type', 'agent_commission')
-        .gte('created_at', monthStart.toISOString())
+      const { data: allRows, error } = await fetchRevenue()
       if (error) throw error
+      const rows = (allRows ?? []).filter((r) => r.type === 'agent_commission' && new Date(r.created_at) >= monthStart)
 
       const totals = {}
       let total = 0

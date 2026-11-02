@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { supabase } from '../lib/supabase'
+import { fetchRevenue } from '../lib/revenue'
 import KpiCard from '../components/KpiCard'
 
 // Wallet balances, transaction counts, and revenue are now genuinely
 // live, pulled from Supabase. GetAnchor and SMS costs remain sample —
 // genuinely dependent on those third-party integrations, which aren't
 // built yet.
-const SAMPLE_ANCHOR_FEES = 18200          // GetAnchor's per-transaction processing fee
-const SAMPLE_SMS_FEES = 4800              // SMS provider charges for redemption codes
 
 function formatNaira(n) {
   return '₦' + n.toLocaleString('en-NG')
@@ -25,13 +24,18 @@ export default function Dashboard() {
     growthByMonth: [],
     realGrossFees: 0, realOnboardingFees: 0, realAgentCommission: 0,
     realWalletTotal: 0, pendingPickup: 0, completedPickup: 0, dailyTx: [],
+    personalWalletTotal: null, agentWalletTotal: null,
+    settlementCredited: 0, settlementWithdrawn: 0, commissionPoints: 0,
   })
+  const [balanceNote, setBalanceNote] = useState('')
+  const [updatedAt, setUpdatedAt] = useState(null)
 
   useEffect(() => {
     let cancelled = false
+    let first = true
 
     async function load() {
-      setLoading(true)
+      if (first) setLoading(true)
       setError(null)
       try {
         const [
@@ -60,9 +64,9 @@ export default function Dashboard() {
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'personal').eq('status', 'rejected'),
           supabase.from('kyc_records').select('*', { count: 'exact', head: true }).eq('role', 'agent').eq('status', 'rejected'),
           supabase.from('profiles').select('created_at').order('created_at', { ascending: true }),
-          supabase.from('company_revenue').select('type, amount'),
-          supabase.from('wallets').select('available'),
-          supabase.from('agent_accounts').select('float'),
+          fetchRevenue(),
+          supabase.rpc('admin_personal_wallets'),
+          supabase.rpc('admin_agent_wallets'),
           supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'send').eq('status', 'pendingCollection'),
           supabase.from('transactions').select('*', { count: 'exact', head: true }).eq('type', 'send').eq('status', 'collected'),
           supabase.from('transactions').select('date_time').eq('type', 'send').order('date_time', { ascending: false }).limit(1000),
@@ -87,8 +91,37 @@ export default function Dashboard() {
         const realOnboardingFees = (revenueRows ?? []).filter((r) => r.type === 'onboarding_fee').reduce((sum, r) => sum + Number(r.amount), 0)
         const realAgentCommission = (revenueRows ?? []).filter((r) => r.type === 'agent_commission').reduce((sum, r) => sum + Number(r.amount), 0)
 
-        const realWalletTotal = (personalWallets ?? []).reduce((sum, w) => sum + Number(w.available), 0)
-          + (agentWallets ?? []).reduce((sum, a) => sum + Number(a.float), 0)
+        // Wallet money lives at Anchor, so balances are read live from Anchor by the admin-api function.
+        let realWalletTotal = 0
+        let personalWalletTotal = null
+        let agentWalletTotal = null
+        let note = ''
+        try {
+          const personalIds = (personalWallets ?? []).map((w) => w.anchor_account_id).filter(Boolean)
+          const agentIds = (agentWallets ?? []).map((w) => w.anchor_account_id).filter(Boolean)
+          const accountIds = [...personalIds, ...agentIds]
+          if (accountIds.length === 0) {
+            personalWalletTotal = 0
+            agentWalletTotal = 0
+          } else {
+            const { data: bal, error: balError } = await supabase.functions.invoke('admin-api', { body: { action: 'balances', account_ids: accountIds } })
+            if (balError || !bal?.ok) {
+              note = (bal && bal.error) || 'Live balances are not available: check that the admin-api function is deployed in Supabase.'
+            } else {
+              const sum = (ids) => ids.reduce((t, id) => t + (Number(bal.balances?.[id]) || 0), 0) / 100
+              personalWalletTotal = sum(personalIds)
+              agentWalletTotal = sum(agentIds)
+              realWalletTotal = personalWalletTotal + agentWalletTotal
+            }
+          }
+        } catch (e) {
+          note = 'Live balances are not available right now.'
+        }
+        const settlementCredited = (agentWallets ?? []).reduce((t, a) => t + (Number(a.cash_received_kobo) || 0), 0) / 100
+        const settlementWithdrawn = (agentWallets ?? []).reduce((t, a) => t + (Number(a.withdrawn_kobo) || 0), 0) / 100
+        const commissionPoints = (agentWallets ?? []).reduce((t, a) => t + (Number(a.commission_total_points) || 0), 0)
+        setBalanceNote(note)
+        setUpdatedAt(new Date())
 
         // Bucket the last 7 days of send transactions by day for the chart.
         const dayCounts = {}
@@ -118,16 +151,23 @@ export default function Dashboard() {
           pendingPickup: pendingPickup ?? 0,
           completedPickup: completedPickup ?? 0,
           dailyTx,
+          personalWalletTotal,
+          agentWalletTotal,
+          settlementCredited,
+          settlementWithdrawn,
+          commissionPoints,
         })
       } catch (err) {
         if (!cancelled) setError(err.message || 'Could not load dashboard data.')
       } finally {
+        first = false
         if (!cancelled) setLoading(false)
       }
     }
 
     load()
-    return () => { cancelled = true }
+    const timer = setInterval(load, 60000) // keep every figure live
+    return () => { cancelled = true; clearInterval(timer) }
   }, [])
 
   return (
@@ -155,7 +195,22 @@ export default function Dashboard() {
         <KpiCard label="Rejected agents" value={loading ? '—' : stats.rejectedAgents} icon="✕" tint="gold" />
       </div>
 
-      <SectionLabel>Money & transactions — fees & commission now live, rest still sample</SectionLabel>
+      <SectionLabel>Wallets, settlement, claims & commission — live{updatedAt ? ` · updated ${updatedAt.toLocaleTimeString()}` : ''}</SectionLabel>
+      {balanceNote && (
+        <div style={{ background: 'var(--gold-tint)', color: '#854F0B', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, marginBottom: 12 }}>{balanceNote}</div>
+      )}
+      <div style={grid}>
+        <KpiCard label="Personal wallet balance" value={loading || stats.personalWalletTotal === null ? '—' : formatNaira(stats.personalWalletTotal)} icon="👛" tint="navy" />
+        <KpiCard label="Agent wallet balance" value={loading || stats.agentWalletTotal === null ? '—' : formatNaira(stats.agentWalletTotal)} icon="🏪" tint="navy" />
+        <KpiCard label="Settled to agents (credited)" value={loading ? '—' : formatNaira(stats.settlementCredited)} icon="💸" tint="green" />
+        <KpiCard label="Withdrawn by agents" value={loading ? '—' : formatNaira(stats.settlementWithdrawn)} icon="🏦" tint="gold" />
+        <KpiCard label="Claims waiting for pickup" value={loading ? '—' : stats.pendingPickup} icon="⏳" tint="gold" />
+        <KpiCard label="Claims completed" value={loading ? '—' : stats.completedPickup} icon="✅" tint="green" />
+        <KpiCard label="Agent commission earned" value={loading ? '—' : formatNaira(stats.commissionPoints)} icon="⭐" tint="green" />
+        <KpiCard label="Agent commission paid out" value={loading ? '—' : formatNaira(stats.realAgentCommission)} icon="💰" tint="navy" />
+      </div>
+
+      <SectionLabel>Money & transactions — live</SectionLabel>
       <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 16, marginBottom: 14 }}>
         <RevenueBreakdown realGrossFees={stats.realGrossFees} realOnboardingFees={stats.realOnboardingFees} realAgentCommission={stats.realAgentCommission} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
@@ -166,10 +221,10 @@ export default function Dashboard() {
             label="Net margin"
             value={
               stats.realGrossFees + stats.realOnboardingFees > 0
-                ? (((stats.realGrossFees + stats.realOnboardingFees - stats.realAgentCommission - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES) / (stats.realGrossFees + stats.realOnboardingFees)) * 100).toFixed(1) + '%'
+                ? (((stats.realGrossFees + stats.realOnboardingFees - stats.realAgentCommission) / (stats.realGrossFees + stats.realOnboardingFees)) * 100).toFixed(1) + '%'
                 : '—'
             }
-            icon="📊" tint="green" sample
+            icon="📊" tint="green"
           />
         </div>
       </div>
@@ -213,14 +268,12 @@ function SectionLabel({ children }) {
 
 function RevenueBreakdown({ realGrossFees, realOnboardingFees, realAgentCommission }) {
   const totalRealRevenue = realGrossFees + realOnboardingFees
-  const netRevenue = totalRealRevenue - realAgentCommission - SAMPLE_ANCHOR_FEES - SAMPLE_SMS_FEES
+  const netRevenue = totalRealRevenue - realAgentCommission
 
   const rows = [
     { label: 'Transaction fees (1.020% per send)', value: realGrossFees, kind: 'total', live: true },
     { label: 'Agent onboarding fees', value: realOnboardingFees, kind: 'total', live: true },
     { label: 'Agent commission paid', value: -realAgentCommission, kind: 'expense', live: true },
-    { label: 'Anchor (GetAnchor) processing fees', value: -SAMPLE_ANCHOR_FEES, kind: 'expense', live: false },
-    { label: 'SMS charges fees', value: -SAMPLE_SMS_FEES, kind: 'expense', live: false },
   ]
 
   return (
@@ -228,7 +281,7 @@ function RevenueBreakdown({ realGrossFees, realOnboardingFees, realAgentCommissi
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h3 style={{ fontSize: 14 }}>Revenue breakdown</h3>
         <span style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--slate)' }}>
-          Fees genuinely tracked live — commission/Anchor/SMS still sample
+          All live. Anchor and SMS costs are not included.
         </span>
       </div>
 
