@@ -23,6 +23,7 @@ import Support from './pages/Support'
 import ApiMonitoring from './pages/ApiMonitoring'
 import Administration from './pages/Administration'
 import SystemSettings from './pages/SystemSettings'
+import IncomeExpenses from './pages/IncomeExpenses'
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/support" element={<Support />} />
             <Route path="/api-monitoring" element={<ApiMonitoring />} />
+            <Route path="/income-expenses" element={<IncomeExpenses />} />
             <Route path="/administration" element={<Administration />} />
             <Route path="/system-settings" element={<SystemSettings />} />
           </Route>

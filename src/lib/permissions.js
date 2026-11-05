@@ -5,6 +5,7 @@
 //
 // This mapping is a reasonable starting default, not a fixed spec —
 // adjust freely as the team's actual workflow becomes clearer.
+// '/income-expenses' is deliberately in NO role's list below: only super_admin can open it.
 export const ROLE_PERMISSIONS = {
   finance_admin: ['/', '/analytics', '/transactions', '/claim-codes', '/cash-pickup', '/wallets', '/settlement', '/commission'],
   support: ['/', '/personal-accounts', '/agent-accounts', '/cash-pickup', '/claim-codes', '/support', '/notifications'],
